@@ -160,7 +160,7 @@ enum LriDef {
 // MultiPacket:
 //  Packet-first: Cmd0=08 Byte[18]=0x7E
 //  Packet-last : Cmd1=01=cmdcodetowait 
-#pragma pack 1
+#pragma pack(1) //bracket was missing. not sure if it supposed to have push or pull also..
 typedef struct __attribute__ ((packed)) PacketHeader {
     uint8_t   SOP;                // Start Of Packet (0x7E)
     uint16_t  pkLength;
