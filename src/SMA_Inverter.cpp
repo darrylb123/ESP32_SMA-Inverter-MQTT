@@ -24,6 +24,11 @@ SOFTWARE.
 
 #include <Arduino.h>
 #include "SMA_Inverter.h"
+#include "SMA_bluetooth.h"
+#include "SMA_utils.h"
+#include "BluetoothSerial.h"
+#include "ESP32_SMA_Inverter_MQTT.h"
+#include "ESP32_SMA_Inverter_App_Config.h"
 
 int32_t  value32 = 0;
 int64_t  value64 = 0;
@@ -31,12 +36,38 @@ uint64_t totalWh = 0;
 uint64_t totalWh_prev = 0;
 time_t   dateTime = 0;
 
-InverterData InvData;
-InverterData *pInvData = &InvData;
-DisplayData DispData;
-DisplayData *pDispData = &DispData;
 
-bool isValidSender(uint8_t expAddr[6], uint8_t isAddr[6]) {
+const char btPin[] = {'0','0','0','0',0}; // BT pin Always 0000. (not login passcode!)
+
+InverterData ESP32_SMA_Inverter::invData = InverterData();
+DisplayData ESP32_SMA_Inverter::dispData = DisplayData();
+InverterData* ESP32_SMA_Inverter::pInvData = &ESP32_SMA_Inverter::invData;
+DisplayData* ESP32_SMA_Inverter::pDispData = &ESP32_SMA_Inverter::dispData;
+
+
+bool ESP32_SMA_Inverter::begin(String localName, bool isMaster) {
+  boolean bOk = false;
+    bOk = serialBT.begin("ESP32toSMA", true);   // "true" creates this device as a BT Master.
+    bOk &= serialBT.setPin(&btPin[0]); 
+    return bOk;
+}
+
+
+bool ESP32_SMA_Inverter::connect(uint8_t remoteAddress[]) {
+  bool bGotConnected = serialBT.connect(remoteAddress);
+  btConnected = bGotConnected;
+  return bGotConnected; 
+}
+
+bool ESP32_SMA_Inverter::disconnect() {
+  bool bGotDisconnected = serialBT.disconnect();
+  btConnected = false;
+  return bGotDisconnected;
+}
+
+//serialBT.disconnect();
+
+bool ESP32_SMA_Inverter::isValidSender(uint8_t expAddr[6], uint8_t isAddr[6]) {
   for (int i = 0; i < 6; i++)
     if ((isAddr[i] != expAddr[i]) && (expAddr[i] != 0xFF)) {
       DEBUG2_PRINTF("\nShoud-Addr: %02X %02X %02X %02X %02X %02X\n   Is-Addr: %02X %02X %02X %02X %02X %02X\n",
@@ -49,20 +80,20 @@ bool isValidSender(uint8_t expAddr[6], uint8_t isAddr[6]) {
 
 // ----------------------------------------------------------------------------------------------
 //unsigned int readBtPacket(int index, unsigned int cmdcodetowait) {
-E_RC getPacket(uint8_t expAddr[6], int wait4Command) {
-  extern BluetoothSerial SerialBT;
+E_RC ESP32_SMA_Inverter::getPacket(uint8_t expAddr[6], int wait4Command) {
+  //extern BluetoothSerial serialBT;
   DEBUG3_PRINTF("getPacket cmd=0x%04x\n", wait4Command);
-  extern bool ReadTimeout;
+  //extern bool readTimeout;
   int index = 0;
   bool hasL2pckt = false;
   E_RC rc = E_OK; 
-  L1Hdr *pL1Hdr = (L1Hdr *)&BTrdBuf[0];
+  L1Hdr *pL1Hdr = (L1Hdr *)&btrdBuf[0];
   do {
     // read L1Hdr
     uint8_t rdCnt=0;
     for (rdCnt=0;rdCnt<18;rdCnt++) {
-      BTrdBuf[rdCnt]= BTgetByte();
-      if (ReadTimeout)  break;
+      btrdBuf[rdCnt]= BTgetByte();
+      if (readTimeout)  break;
     }
     DEBUG2_PRINTF("\nL1 Rec=%d bytes pkL=0x%04x=%d Cmd=0x%04x\n",
         rdCnt, pL1Hdr->pkLength, pL1Hdr->pkLength, pL1Hdr->command);
@@ -75,14 +106,14 @@ E_RC getPacket(uint8_t expAddr[6], int wait4Command) {
       return E_NODATA;
     }
     // Validate L1 header
-    if (!((BTrdBuf[0] ^ BTrdBuf[1] ^ BTrdBuf[2]) == BTrdBuf[3])) {
+    if (!((btrdBuf[0] ^ btrdBuf[1] ^ btrdBuf[2]) == btrdBuf[3])) {
       DEBUG1_PRINT("\nWrong L1 CRC!!" );
     }
 
     if (pL1Hdr->pkLength > sizeof(L1Hdr)) { // more bytes to read
       for (rdCnt=18; rdCnt<pL1Hdr->pkLength; rdCnt++) {
-        BTrdBuf[rdCnt]= BTgetByte();
-        if (ReadTimeout) break;
+        btrdBuf[rdCnt]= BTgetByte();
+        if (readTimeout) break;
       }
       DEBUG3_PRINTF("L2 Rec=%d bytes", rdCnt-18);
       #if (DEBUG_SMA > 2)
@@ -93,8 +124,8 @@ E_RC getPacket(uint8_t expAddr[6], int wait4Command) {
       if (isValidSender(expAddr, pL1Hdr->SourceAddr)) {
         rc = E_OK;
 
-        DEBUG2_PRINTF("HasL2pckt: 0x7E?=0x%02X 0x656003FF?=0x%08X\n", BTrdBuf[18], get_u32(BTrdBuf+19));
-        if ((hasL2pckt == 0) && (BTrdBuf[18] == 0x7E) && (get_u32(BTrdBuf+19) == 0x656003FF)) {
+        DEBUG2_PRINTF("HasL2pckt: 0x7E?=0x%02X 0x656003FF?=0x%08X\n", btrdBuf[18], get_u32(btrdBuf+19));
+        if ((hasL2pckt == 0) && (btrdBuf[18] == 0x7E) && (get_u32(btrdBuf+19) == 0x656003FF)) {
           hasL2pckt = true;
         }
 
@@ -103,7 +134,7 @@ E_RC getPacket(uint8_t expAddr[6], int wait4Command) {
           bool escNext = false;
 
           for (int i=sizeof(L1Hdr); i<pL1Hdr->pkLength; i++) {
-            pcktBuf[index] = BTrdBuf[i];
+            pcktBuf[index] = btrdBuf[i];
             //Keep 1st byte raw unescaped 0x7E
             if (escNext == true) {
               pcktBuf[index] ^= 0x20;
@@ -115,13 +146,13 @@ E_RC getPacket(uint8_t expAddr[6], int wait4Command) {
               else
                 index++;
             }
-            if (index >= maxpcktBufsize) {
+            if (index >= MAX_PCKT_BUF_SIZE) {
               DEBUG1_PRINTF("pcktBuf overflow! (%d)\n", index);
             }
           }
           pcktBufPos = index;
         } else {  // no L2pckt
-          memcpy(pcktBuf, BTrdBuf, rdCnt);
+          memcpy(pcktBuf, btrdBuf, rdCnt);
           pcktBufPos = rdCnt;
         }
       } else { // isValidSender()
@@ -135,14 +166,14 @@ E_RC getPacket(uint8_t expAddr[6], int wait4Command) {
       if (isValidSender(expAddr, pL1Hdr->SourceAddr)) {
           rc = E_OK;
 
-          memcpy(pcktBuf, BTrdBuf, rdCnt);
+          memcpy(pcktBuf, btrdBuf, rdCnt);
           pcktBufPos = rdCnt;
       } else { // isValidSender()
           rc = E_RETRY;
       }
     }
-    if (BTrdBuf[0] != '\x7e') { 
-       SerialBT.flush();
+    if (btrdBuf[0] != '\x7e') { 
+       serialBT.flush();
        DEBUG2_PRINT("\nCommBuf[0]!=0x7e -> BT-flush");
     }
   } while (((pL1Hdr->command != wait4Command) || (rc == E_RETRY)) && (0xFF != wait4Command));
@@ -165,27 +196,27 @@ E_RC getPacket(uint8_t expAddr[6], int wait4Command) {
 
 // *************************************************
 
-void writePacketHeader(uint8_t *buf, const uint16_t control, const uint8_t *destaddress) {
-  extern uint16_t FCSChecksum;
+void ESP32_SMA_Inverter::writePacketHeader(uint8_t *buf, const uint16_t control, const uint8_t *destaddress) {
+  //extern uint16_t fcsChecksum;
 
 
     pcktBufPos = 0;
 
-    FCSChecksum = 0xFFFF;
+    fcsChecksum = 0xFFFF;
     buf[pcktBufPos++] = 0x7E;
     buf[pcktBufPos++] = 0;  //placeholder for len1
     buf[pcktBufPos++] = 0;  //placeholder for len2
     buf[pcktBufPos++] = 0;  //placeholder for checksum
     int i;
-    for(i = 0; i < 6; i++) buf[pcktBufPos++] = EspBTAddress[i];
+    for(i = 0; i < 6; i++) buf[pcktBufPos++] = espBTAddress[i];
     for(i = 0; i < 6; i++) buf[pcktBufPos++] = destaddress[i];
 
     buf[pcktBufPos++] = (uint8_t)(control & 0xFF);
     buf[pcktBufPos++] = (uint8_t)(control >> 8);
 }
 // ***********************************************
-E_RC getInverterDataCfl(uint32_t command, uint32_t first, uint32_t last) {
-  extern uint8_t sixff[6];
+E_RC ESP32_SMA_Inverter::getInverterDataCfl(uint32_t command, uint32_t first, uint32_t last) {
+  //extern uint8_t sixff[6];
     pcktID++;
     writePacketHeader(pcktBuf, 0x01, sixff); //addr_unknown);
     //if (pInvData->SUSyID == SID_SB240)
@@ -421,7 +452,7 @@ E_RC getInverterDataCfl(uint32_t command, uint32_t first, uint32_t last) {
    return pInvData->status;
 }
 // ***********************************************
-E_RC getInverterData(enum getInverterDataType type) {
+E_RC ESP32_SMA_Inverter::getInverterData(enum getInverterDataType type) {
   E_RC rc = E_OK;
   uint32_t command;
   uint32_t first;
@@ -560,7 +591,7 @@ E_RC getInverterData(enum getInverterDataType type) {
 }
 
 //-------------------------------------------------------------------------
-bool getBT_SignalStrength() {
+bool ESP32_SMA_Inverter::getBT_SignalStrength() {
   DEBUG2_PRINT("\n\n*** SignalStrength ***");
   writePacketHeader(pcktBuf, 0x03, pInvData->BTAddress);
   writeByte(pcktBuf,0x05);
@@ -569,14 +600,14 @@ bool getBT_SignalStrength() {
   BTsendPacket(pcktBuf);
 
   getPacket(pInvData->BTAddress, 4);
-  pDispData->BTSigStrength = ((float)BTrdBuf[22] * 100.0f / 255.0f);
+  pDispData->BTSigStrength = ((float)btrdBuf[22] * 100.0f / 255.0f);
   DEBUG1_PRINTF("BT-Signal %9.1f %%", pDispData->BTSigStrength );
   return true;
 }
 
 //-------------------------------------------------------------------------
-E_RC initialiseSMAConnection() {
-  extern uint8_t sixff[6];
+E_RC ESP32_SMA_Inverter::initialiseSMAConnection() {
+  //extern uint8_t sixff[6];
   DEBUG2_PRINTLN(" -> Initialize");
   getPacket(pInvData->BTAddress, 2); // 1. Receive
   pInvData->NetID = pcktBuf[22];
@@ -589,13 +620,13 @@ E_RC initialiseSMAConnection() {
   writePacketLength(pcktBuf);
 
   BTsendPacket(pcktBuf);             // 1. Reply
-  getPacket(pInvData->BTAddress, 5); // 2. Receive
+  ESP32_SMA_Inverter::getPacket(pInvData->BTAddress, 5); // 2. Receive
 
   // Extract ESP32 BT address
-  memcpy(EspBTAddress, pcktBuf+26,6); 
+  memcpy(espBTAddress, pcktBuf+26,6); 
   DEBUG3_PRINTF("ESP32 BT address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-             EspBTAddress[5], EspBTAddress[4], EspBTAddress[3],
-             EspBTAddress[2], EspBTAddress[1], EspBTAddress[0]);
+             espBTAddress[5], espBTAddress[4], espBTAddress[3],
+             espBTAddress[2], espBTAddress[1], espBTAddress[0]);
 
   pcktID++;
   writePacketHeader(pcktBuf, 0x01, sixff); //addr_unknown);
@@ -619,9 +650,9 @@ E_RC initialiseSMAConnection() {
 }
 
 // log off SMA Inverter - adapted from SBFspot Open Source Project (SBFspot.cpp) by mrtoy-me
-void logoffSMAInverter()
+void ESP32_SMA_Inverter::logoffSMAInverter()
 {
-  extern uint8_t sixff[6];
+  //extern uint8_t sixff[6];
   pcktID++;
   writePacketHeader(pcktBuf, 0x01, sixff);
   writePacket(pcktBuf, 0x08, 0xA0, 0x0300, 0xFFFF, 0xFFFFFFFF);
@@ -634,8 +665,8 @@ void logoffSMAInverter()
 }
 
 // **** Logon SMA **********
-E_RC logonSMAInverter(const char *password, const uint8_t user) {
-  extern uint8_t sixff[6];
+E_RC ESP32_SMA_Inverter::logonSMAInverter(const char *password, const uint8_t user) {
+  //extern uint8_t sixff[6];
   #define MAX_PWLENGTH 12
   uint8_t pw[MAX_PWLENGTH];
   E_RC rc = E_OK;
@@ -680,7 +711,7 @@ E_RC logonSMAInverter(const char *password, const uint8_t user) {
       // }
     } else { 
       DEBUG1_PRINTF("Unexpected response  %02X:%02X:%02X:%02X:%02X:%02X pcktID=0x%04X rcvpcktID=0x%04X now=0x%04X", 
-                   BTrdBuf[9], BTrdBuf[8], BTrdBuf[7], BTrdBuf[6], BTrdBuf[5], BTrdBuf[4],
+                   btrdBuf[9], btrdBuf[8], btrdBuf[7], btrdBuf[6], btrdBuf[5], btrdBuf[4],
                    pcktID, rcvpcktID, now);
       rc = E_INVRESP;
     }
@@ -794,7 +825,7 @@ E_RC ArchiveDayData(time_t startTime) {
 }
 */
 // ******* read SMA current data **********
-E_RC ReadCurrentData() {
+E_RC ESP32_SMA_Inverter::ReadCurrentData() {
   if (!btConnected) {
     charLen += snprintf(charBuf+charLen, CHAR_BUF_MAX-charLen, "Bluetooth offline!\n");
     return E_NODATA;

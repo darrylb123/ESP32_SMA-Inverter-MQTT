@@ -1,3 +1,6 @@
+#pragma once 
+#ifndef ESP32_SMA_UTILS_H
+#define ESP32_SMA_UTILS_H
 /* MIT License
 
 Copyright (c) 2022 Lupo135
@@ -22,8 +25,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SMA_UTILS.H
-#define SMA_UTILS.H
+
 // Debug ------------------------------------------------
 #if (DEBUG_SMA > 0)
   #define  DEBUG1_PRINTF   Serial.printf
@@ -56,10 +58,10 @@ SOFTWARE.
 #endif
 
 // Prototypes
-void HexDump(uint8_t *buf, int count, int radix, uint8_t c);
-uint8_t printUnixTime(char *buf, time_t t);
-uint16_t get_u16(uint8_t *buf);
-uint32_t get_u32(uint8_t *buf);
-uint64_t get_u64(uint8_t *buf);
+extern void HexDump(uint8_t *buf, int count, int radix, uint8_t c);
+extern uint8_t printUnixTime(char *buf, time_t t);
+extern uint16_t get_u16(uint8_t *buf);
+extern uint32_t get_u32(uint8_t *buf);
+extern uint64_t get_u64(uint8_t *buf);
 
 #endif

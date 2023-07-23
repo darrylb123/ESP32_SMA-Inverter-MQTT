@@ -23,17 +23,17 @@ SOFTWARE.
 */
 #include <Arduino.h>
 #include "SMA_bluetooth.h"
-#include "Utils.h"
+#include "SMA_Utils.h"
+#include "BluetoothSerial.h"
+#include "ESP32_SMA_Inverter_MQTT.h"
 
+//extern bool readTimeout = false;
+//extern uint16_t fcsChecksum=0xffff;
+//extern BluetoothSerial serialBT;
+//extern uint8_t sixzeros[6]= {0x00,0x00,0x00,0x00,0x00,0x00};
+//extern uint8_t sixff[6]   = {0xff,0xff,0xff,0xff,0xff,0xff};
 
-
-bool ReadTimeout = false;
-uint16_t FCSChecksum=0xffff;
-BluetoothSerial SerialBT;
-uint8_t sixzeros[6]= {0x00,0x00,0x00,0x00,0x00,0x00};
-uint8_t sixff[6]   = {0xff,0xff,0xff,0xff,0xff,0xff};
-
-PROGMEM prog_uint16_t  fcstab[256]  = {
+/*extern PROGMEM prog_uint16_t  fcstab[256]  = {
   0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
   0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,0x9cc9, 0x8d40, 0xbfdb, 0xae52, 0xdaed, 0xcb64, 0xf9ff, 0xe876,
   0x2102, 0x308b, 0x0210, 0x1399, 0x6726, 0x76af, 0x4434, 0x55bd,0xad4a, 0xbcc3, 0x8e58, 0x9fd1, 0xeb6e, 0xfae7, 0xc87c, 0xd9f5,
@@ -51,29 +51,30 @@ PROGMEM prog_uint16_t  fcstab[256]  = {
   0xe70e, 0xf687, 0xc41c, 0xd595, 0xa12a, 0xb0a3, 0x8238, 0x93b1,0x6b46, 0x7acf, 0x4854, 0x59dd, 0x2d62, 0x3ceb, 0x0e70, 0x1ff9,
   0xf78f, 0xe606, 0xd49d, 0xc514, 0xb1ab, 0xa022, 0x92b9, 0x8330,0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 };
+*/
 
 
 // **** receive BT byte *******
-uint8_t BTgetByte() {
-  ReadTimeout = false;
+uint8_t ESP32_SMA_Bluetooth::BTgetByte() {
+  readTimeout = false;
   //Returns a single byte from the bluetooth stream (with error timeout/reset)
   uint32_t time = 20000+millis(); // 20 sec 
   uint8_t  rec = 0;  
 
-  while (!SerialBT.available() ) {
+  while (!serialBT.available() ) {
     //delay(5);  //Wait for BT byte to arrive
     if (millis() > time) { 
       DEBUG2_PRINTLN("BTgetByte Timeout");
-      ReadTimeout = true;
+      readTimeout = true;
       break;
     }
   }
 
-  if (!ReadTimeout) rec = SerialBT.read();
+  if (!readTimeout) rec = serialBT.read();
   return rec;
 }
 // **** transmit BT buffer ****
-void BTsendPacket( uint8_t *btbuffer ) {
+void ESP32_SMA_Bluetooth::BTsendPacket( uint8_t *btbuffer ) {
   //DEBUG2_PRINTLN();
   for(int i=0;i<pcktBufPos;i++) {
     #ifdef DebugBT
@@ -90,7 +91,7 @@ void BTsendPacket( uint8_t *btbuffer ) {
     if ((i==18)||(i==18+16)||(i==18+32)||(i==18+48)) DEBUG2_PRINTF("\nsDat[%d]=",i);
     DEBUG2_PRINTF("%02X,", *(btbuffer+i)); // Print out what we are sending, in hex, for inspection.
     #endif
-    SerialBT.write( *(btbuffer+i) );  // Send to SMA via ESP32 bluetooth
+    serialBT.write( *(btbuffer+i) );  // Send to SMA via ESP32 bluetooth
   }
   HexDump(btbuffer, pcktBufPos, 10, 'T');
 }
@@ -98,9 +99,9 @@ void BTsendPacket( uint8_t *btbuffer ) {
 
 //-------------------------------------------------------------------------
 // ********************************************************
-void writeByte(uint8_t *btbuffer, uint8_t v) {
+void ESP32_SMA_Bluetooth::writeByte(uint8_t *btbuffer, uint8_t v) {
   //Keep a rolling checksum over the payload
-  FCSChecksum = (FCSChecksum >> 8) ^ fcstab[(FCSChecksum ^ v) & 0xff];
+  fcsChecksum = (fcsChecksum >> 8) ^ fcstab[(fcsChecksum ^ v) & 0xff];
   if (v == 0x7d || v == 0x7e || v == 0x11 || v == 0x12 || v == 0x13) {
     btbuffer[pcktBufPos++] = 0x7d;
     btbuffer[pcktBufPos++] = v ^ 0x20;
@@ -109,24 +110,24 @@ void writeByte(uint8_t *btbuffer, uint8_t v) {
   }
 }
 // ********************************************************
-void write32(uint8_t *btbuffer, uint32_t v) {
+void ESP32_SMA_Bluetooth::write32(uint8_t *btbuffer, uint32_t v) {
   writeByte(btbuffer,(uint8_t)((v >> 0) & 0xFF));
   writeByte(btbuffer,(uint8_t)((v >> 8) & 0xFF));
   writeByte(btbuffer,(uint8_t)((v >> 16) & 0xFF));
   writeByte(btbuffer,(uint8_t)((v >> 24) & 0xFF));
 }
 // ********************************************************
-void write16(uint8_t *btbuffer, uint16_t v) {
+void ESP32_SMA_Bluetooth::write16(uint8_t *btbuffer, uint16_t v) {
   writeByte(btbuffer,(uint8_t)((v >> 0) & 0xFF));
   writeByte(btbuffer,(uint8_t)((v >> 8) & 0xFF));
 }
 // ********************************************************
-void writeArray(uint8_t *btbuffer, const uint8_t bytes[], int loopcount) {
+void ESP32_SMA_Bluetooth::writeArray(uint8_t *btbuffer, const uint8_t bytes[], int loopcount) {
     for (int i = 0; i < loopcount; i++) writeByte(btbuffer, bytes[i]);
 }
 // ********************************************************
 //  writePacket(pcktBuf, 0x0E, 0xA0, 0x0100, 0xFFFF, 0xFFFFFFFF); // anySUSyID, anySerial);
-void writePacket(uint8_t *buf, uint8_t longwords, uint8_t ctrl, uint16_t ctrl2, uint16_t dstSUSyID, uint32_t dstSerial) {
+void ESP32_SMA_Bluetooth::writePacket(uint8_t *buf, uint8_t longwords, uint8_t ctrl, uint16_t ctrl2, uint16_t dstSUSyID, uint32_t dstSerial) {
   buf[pcktBufPos++] = 0x7E;   //Not included in checksum
   write32(buf, BTH_L2SIGNATURE);
   writeByte(buf, longwords);
@@ -134,40 +135,40 @@ void writePacket(uint8_t *buf, uint8_t longwords, uint8_t ctrl, uint16_t ctrl2, 
   write16(buf, dstSUSyID);
   write32(buf, dstSerial);
   write16(buf, ctrl2);
-  write16(buf, AppSUSyID);
-  write32(buf, AppSerial);
+  write16(buf, ESP32_SMA_Inverter_App::appSUSyID);
+  write32(buf, ESP32_SMA_Inverter_App::appSerial);
   write16(buf, ctrl2);
   write16(buf, 0);
   write16(buf, 0);
   write16(buf, pcktID | 0x8000);
 }
 //-------------------------------------------------------------------------
-void writePacketTrailer(uint8_t *btbuffer) {
-  FCSChecksum ^= 0xFFFF;
-  btbuffer[pcktBufPos++] = FCSChecksum & 0x00FF;
-  btbuffer[pcktBufPos++] = (FCSChecksum >> 8) & 0x00FF;
+void ESP32_SMA_Bluetooth::writePacketTrailer(uint8_t *btbuffer) {
+  fcsChecksum ^= 0xFFFF;
+  btbuffer[pcktBufPos++] = fcsChecksum & 0x00FF;
+  btbuffer[pcktBufPos++] = (fcsChecksum >> 8) & 0x00FF;
   btbuffer[pcktBufPos++] = 0x7E;  //Trailing byte
 }
 //-------------------------------------------------------------------------
-void writePacketLength(uint8_t *buf) {
+void ESP32_SMA_Bluetooth::writePacketLength(uint8_t *buf) {
   buf[1] = pcktBufPos & 0xFF;         //Lo-Byte
   buf[2] = (pcktBufPos >> 8) & 0xFF;  //Hi-Byte
   buf[3] = buf[0] ^ buf[1] ^ buf[2];      //checksum
 }
 //-------------------------------------------------------------------------
-bool validateChecksum() {
-  FCSChecksum = 0xffff;
+bool ESP32_SMA_Bluetooth::validateChecksum() {
+  fcsChecksum = 0xffff;
   //Skip over 0x7e at start and end of packet
   for(int i = 1; i <= pcktBufPos - 4; i++) {
-    FCSChecksum = (FCSChecksum >> 8) ^ fcstab[(FCSChecksum ^ pcktBuf[i]) & 0xff];
+    fcsChecksum = (fcsChecksum >> 8) ^ fcstab[(fcsChecksum ^ pcktBuf[i]) & 0xff];
   }
-  FCSChecksum ^= 0xffff;
+  fcsChecksum ^= 0xffff;
 
-  if (get_u16(pcktBuf+pcktBufPos-3) == FCSChecksum) {
+  if (get_u16(pcktBuf+pcktBufPos-3) == fcsChecksum) {
     return true;
   } else {
     DEBUG1_PRINTF("Invalid validateChecksum 0x%04X not 0x%04X\n", 
-    FCSChecksum, get_u16(pcktBuf+pcktBufPos-3));
+    fcsChecksum, get_u16(pcktBuf+pcktBufPos-3));
     return false;
   }
 }

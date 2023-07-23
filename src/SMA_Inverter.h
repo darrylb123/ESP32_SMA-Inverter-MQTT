@@ -1,3 +1,6 @@
+#pragma once 
+#ifndef ESP32_SMA_INVERTER_H
+#define ESP32_SMA_INVERTER_H
 /* MIT License
 
 Copyright (c) 2022 Lupo135
@@ -22,11 +25,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef SMA_INVERTER.H
-#define SMA_INVERTER.H
 
-
-#include <Arduino.h>
+#include "SMA_bluetooth.h"
 
 #define tokWh(value64)    (double)(value64)/1000
 #define tokW(value32)     (float)(value32)/1000
@@ -42,6 +42,11 @@ SOFTWARE.
 #define UG_USER      0x07
 #define UG_INSTALLER 0x0A
 
+#define ARCH_DAY_SIZE 288
+
+#define CHAR_BUF_MAX 2048
+
+
 enum E_RC {
     E_OK =            0,    // No error
     E_INIT =         -1,    // Unable to initialise
@@ -56,7 +61,6 @@ enum E_RC {
     E_ARCHNODATA =   -10,   // no archive data
 };
 
-#define ARCH_DAY_SIZE 288
 struct InverterData {
     uint8_t BTAddress[6];
     uint8_t SUSyID;
@@ -87,6 +91,10 @@ struct InverterData {
     int32_t GridRelay;
     E_RC     status;
 };
+
+
+
+
 
 struct DisplayData {
   float BTSigStrength;
@@ -204,16 +212,52 @@ typedef struct __attribute__ ((packed)) PacketHeader {
     uint16_t  command;
 } L1Hdr;
 
-//Prototypes
-bool isValidSender(uint8_t expAddr[6], uint8_t isAddr[6]);
-E_RC getPacket(uint8_t expAddr[6], int wait4Command);
-void writePacketHeader(uint8_t *buf, const uint16_t control, const uint8_t *destaddress);
-E_RC getInverterDataCfl(uint32_t command, uint32_t first, uint32_t last);
-E_RC getInverterData(enum getInverterDataType type);
-bool getBT_SignalStrength();
-E_RC initialiseSMAConnection();
-E_RC logonSMAInverter(const char *password, const uint8_t user);
-E_RC ArchiveDayData(time_t startTime);
-E_RC ReadCurrentData();
+class ESP32_SMA_Inverter : public ESP32_SMA_Bluetooth {
+  public: 
+    ESP32_SMA_Inverter() : ESP32_SMA_Bluetooth() {
+    };
+
+    //Prototypes
+    bool isValidSender(uint8_t expAddr[6], uint8_t isAddr[6]);
+    E_RC getPacket(uint8_t expAddr[6], int wait4Command);
+    void writePacketHeader(uint8_t *buf, const uint16_t control, const uint8_t *destaddress);
+    E_RC getInverterDataCfl(uint32_t command, uint32_t first, uint32_t last);
+    E_RC getInverterData(enum getInverterDataType type);
+    bool getBT_SignalStrength();
+    E_RC initialiseSMAConnection();
+    E_RC logonSMAInverter(const char *password, const uint8_t user);
+    void logoffSMAInverter();
+
+    E_RC ArchiveDayData(time_t startTime);
+    E_RC ReadCurrentData();
+
+    bool connect(uint8_t remoteAddress[]);
+    bool disconnect();
+
+    bool isBtConnected() {
+      return btConnected;
+    }
+
+    bool begin(String localName, bool isMaster);
+
+    static InverterData invData;
+    static InverterData *pInvData;// = &invData;
+    static DisplayData dispData;
+    static DisplayData *pDispData;// = &dispData;
+
+  private: 
+    uint8_t  btrdBuf[256];    
+    uint16_t pcktBufMax = 0; // max. used size of PcktBuf
+    uint8_t  espBTAddress[6]; // is retrieved from BT packet
+
+    bool btConnected = false;
+
+    char timeBuf[24];
+    char charBuf[CHAR_BUF_MAX];
+    int  charLen = 0;
+
+};
+
+
 
 #endif

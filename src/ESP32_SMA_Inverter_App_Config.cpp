@@ -3,10 +3,19 @@
 #include <ArduinoJson.h>
 #include <FS.h>
 #include <LittleFS.h>
-#include "Config.h"
+
+#include <WiFi.h>
+#include <WebServer.h>
+// #include <DNSServer.h>
+// #include <ESPmDNS.h>
+#include <Preferences.h>
+#include <PubSubClient.h>
+
+#include "ESP32_SMA_Inverter_App_Config.h"
+
+
 
 #define FORMAT_LITTLEFS_IF_FAILED true
-
 
 // Our configuration structure.
 //
@@ -17,10 +26,8 @@
 
 
 
-
-
 // Loads the configuration from a file
-void loadConfiguration(const char *filename, Config &config) {
+void ESP32_SMA_Inverter_App_Config::loadConfiguration(const char *filename) {
   // Open file for reading
   File file = LittleFS.open(filename,"r");
 
@@ -35,15 +42,15 @@ void loadConfiguration(const char *filename, Config &config) {
     Serial.println(F("Failed to read file, using default configuration"));
 
   // Copy values from the JsonDocument to the Config         
-  config.mqttBroker =     doc["mqttBroker"] | "";
-  config.mqttPort = doc["mqttPort"] | 1883 ;
-  config.mqttUser = doc["mqttUser"] | "";
-  config.mqttPasswd = doc["mqttPasswd"] | "";
-  config.mqttTopic = doc["mqttTopic"] | "SMA";
-  config.SmaInvPass = doc["SmaInvPass"] | "password";
-  config.SmaBTAddress = doc["SmaBTAddress"] | "AA:BB:CC:DD:EE:FF";
-  config.ScanRate = doc["ScanRate"] | 60 ;
-  config.hassDisc = doc["hassDisc"] | true ;
+  appConfig.mqttBroker =     doc["mqttBroker"] | "";
+  appConfig.mqttPort = doc["mqttPort"] | 1883 ;
+  appConfig.mqttUser = doc["mqttUser"] | "";
+  appConfig.mqttPasswd = doc["mqttPasswd"] | "";
+  appConfig.mqttTopic = doc["mqttTopic"] | "SMA";
+  appConfig.smaInvPass = doc["smaInvPass"] | "password";
+  appConfig.smaBTAddress = doc["smaBTAddress"] | "AA:BB:CC:DD:EE:FF";
+  appConfig.scanRate = doc["scanRate"] | 60 ;
+  appConfig.hassDisc = doc["hassDisc"] | true ;
   
   // Close the file (Curiously, File's destructor doesn't close the file)
   file.close();
@@ -51,12 +58,12 @@ void loadConfiguration(const char *filename, Config &config) {
 }
 
 // Saves the configuration to a file
-void saveConfiguration(const char *confFile, const Config &config) {
+void ESP32_SMA_Inverter_App_Config::saveConfiguration(const char *configFile) {
   // Delete existing file, otherwise the configuration is appended to the file
-  LittleFS.remove(confFile);
+  LittleFS.remove(configFile);
 
   // Open file for writing
-  File file = LittleFS.open(confFile, "w");
+  File file = LittleFS.open(configFile, "w");
   if (!file) {
     Serial.println(F("Failed to create file"));
     return;
@@ -68,15 +75,16 @@ void saveConfiguration(const char *confFile, const Config &config) {
   StaticJsonDocument<512> doc;
 
   // Set the values in the document
-  doc["mqttBroker"] = config.mqttBroker;
-  doc["mqttPort"] = config.mqttPort;
-  doc["mqttUser"] = config.mqttUser;
-  doc["mqttPasswd"] = config.mqttPasswd;
-  doc["mqttTopic"] = config.mqttTopic; 
-  doc["SmaInvPass"] = config.SmaInvPass;
-  doc["SmaBTAddress"] = config.SmaBTAddress;
-  doc["ScanRate"] = config.ScanRate;
-  doc["hassDisc"] = config.hassDisc;
+  doc["mqttBroker"] = appConfig.mqttBroker;
+  doc["mqttPort"] = appConfig.mqttPort;
+  doc["mqttPort"] = appConfig.mqttPort;
+  doc["mqttUser"] = appConfig.mqttUser;
+  doc["mqttPasswd"] = appConfig.mqttPasswd;
+  doc["mqttTopic"] = appConfig.mqttTopic; 
+  doc["smaInvPass"] = appConfig.smaInvPass;
+  doc["smaBTAddress"] = appConfig.smaBTAddress;
+  doc["scanRate"] = appConfig.scanRate;
+  doc["hassDisc"] = appConfig.hassDisc;
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write to file"));
@@ -87,9 +95,9 @@ void saveConfiguration(const char *confFile, const Config &config) {
 }
 
 // Prints the content of a file to the Serial
-void printFile(const char *confFile) {
+void ESP32_SMA_Inverter_App_Config::printFile(const char *configFile) {
   // Open file for reading
-  File file = LittleFS.open(confFile,"r");
+  File file = LittleFS.open(configFile,"r");
   if (!file) {
     Serial.println(F("Failed to read file"));
     return;
@@ -105,7 +113,7 @@ void printFile(const char *confFile) {
   file.close();
 }
 
-void configSetup() {
+void ESP32_SMA_Inverter_App_Config::configSetup() {
   // Initialize serial port
   Serial.begin(115200);
   while (!Serial) continue;
@@ -117,18 +125,18 @@ void configSetup() {
 
   // Should load default config if run for the first time
   Serial.println(F("Loading configuration..."));
-  loadConfiguration(confFile, config);
+  loadConfiguration(confFile);
 
   // Create configuration file
   Serial.println(F("Saving configuration..."));
-  saveConfiguration(confFile, config);
+  saveConfiguration(confFile);
 
   // Dump config file
  Serial.println(F("Print config file..."));
   printFile(confFile);
 }
 
-void rmfiles(){
+void ESP32_SMA_Inverter_App_Config::rmfiles(){
   if (LittleFS.remove("/config.txt")) {
     Serial.println("/config.txt removed");
   } else {

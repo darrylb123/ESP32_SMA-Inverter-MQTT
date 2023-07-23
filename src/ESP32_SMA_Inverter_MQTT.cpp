@@ -24,115 +24,98 @@ SOFTWARE.
 
 #include <Arduino.h>
 #include <Esp.h>
-#include "BluetoothSerial.h"
+#include <BluetoothSerial.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <PubSubClient.h>
 //#define RX_QUEUE_SIZE 2048
 //#define TX_QUEUE_SIZE 64
 
-#include "Config.h"
-#include "Utils.h"
+#include "SMA_Utils.h"
 #include "SMA_bluetooth.h"
 #include "SMA_Inverter.h"
 
-// Configuration structure
-Config config;
-const uint16_t AppSUSyID = 125;
-uint32_t AppSerial;
-char SmaInvPass[12]; 
+#include "MQTT.h"
+#include "ESP32_SMA_Inverter_MQTT.h"
 
-// SMA blutooth address
-uint8_t SmaBTAddress[6]; 
+ESP32_SMA_Inverter_App smaInverterApp = ESP32_SMA_Inverter_App();
+ESP32_SMA_Inverter smaInverter = ESP32_SMA_Inverter();
+//ESP32_SMA_MQTT mqtt = ESP32_SMA_MQTT();
 
-//
-#define maxpcktBufsize 512
-uint8_t  BTrdBuf[256];    //  Serial.printf("Connecting to %s\n", ssid);
-uint8_t  pcktBuf[maxpcktBufsize];
-uint16_t pcktBufPos = 0;
-uint16_t pcktBufMax = 0; // max. used size of PcktBuf
-uint16_t pcktID = 1;
-const char BTPin[] = {'0','0','0','0',0}; // BT pin Always 0000. (not login passcode!)
+uint32_t ESP32_SMA_Inverter_App::appSerial=0;
+WiFiClient ESP32_SMA_Inverter_App::espClient = WiFiClient();
+PubSubClient ESP32_SMA_Inverter_App::client = PubSubClient(espClient);
+WebServer ESP32_SMA_Inverter_App::webServer(80);
 
-// const int scanRate = 60;
-uint8_t  EspBTAddress[6]; // is retrieved from BT packet
-uint32_t nextTime = 0;
-// uint32_t nextInterval = scanRate *1000; // 10 sec.
-uint8_t  errCnt = 0;
-bool     btConnected = false;
+ESP32_SMA_MQTT& mqttInstanceForApp = ESP32_SMA_MQTT::getInstance();
+ESP32_SMA_Inverter_App_Config& inverterAppConfig =  ESP32_SMA_Inverter_App_Config::getInstance();
 
-#define CHAR_BUF_MAX 2048
-char timeBuf[24];
-char charBuf[CHAR_BUF_MAX];
-int  charLen = 0;
-bool firstTime = true;
-bool nightTime = false;
-
-
-WiFiClient espClient;
-PubSubClient client(espClient);
-
-// External variables
-extern WebServer webServer;
-extern int smartConfig;
+int ESP32_SMA_Inverter_App::smartConfig = 0;
 
 void setup() { 
-  extern BluetoothSerial SerialBT;
-  extern InverterData *pInvData;
+  smaInverterApp.appSetup();
+}
+
+void ESP32_SMA_Inverter_App::appSetup() { 
   Serial.begin(115200); 
   delay(1000);
-  configSetup();
-  wifiStartup();
+  inverterAppConfig.configSetup();
+  mqttInstanceForApp.wifiStartup();
   
   if ( !smartConfig) {
     // Convert the MAC address string to binary
-    sscanf(config.SmaBTAddress.c_str(), "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", 
-            &SmaBTAddress[0], &SmaBTAddress[1], &SmaBTAddress[2], &SmaBTAddress[3], &SmaBTAddress[4], &SmaBTAddress[5]);
+    sscanf(config.smaBTAddress.c_str(), "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", 
+            &smaBTAddress[0], &smaBTAddress[1], &smaBTAddress[2], &smaBTAddress[3], &smaBTAddress[4], &smaBTAddress[5]);
     // Zero the array, all unused butes must be 0
-    for(int i = 0; i < sizeof(SmaInvPass);i++)
-       SmaInvPass[i] ='\0';
-    strlcpy(SmaInvPass , config.SmaInvPass.c_str(), sizeof(SmaInvPass));
+    for(int i = 0; i < sizeof(smaInvPass);i++)
+       smaInvPass[i] ='\0';
+    strlcpy(smaInvPass , config.smaInvPass.c_str(), sizeof(smaInvPass));
+
+    InverterData *pInvData = ESP32_SMA_Inverter::pInvData;
 
     pInvData->SUSyID = 0x7d;
     pInvData->Serial = 0;
     nextTime = millis();
     // reverse inverter BT address
-    for(uint8_t i=0; i<6; i++) pInvData->BTAddress[i] = SmaBTAddress[5-i];
+    for(uint8_t i=0; i<6; i++) pInvData->BTAddress[i] = smaBTAddress[5-i];
     DEBUG2_PRINTF("pInvData->BTAddress: %02X:%02X:%02X:%02X:%02X:%02X\n",
                 pInvData->BTAddress[5], pInvData->BTAddress[4], pInvData->BTAddress[3],
                 pInvData->BTAddress[2], pInvData->BTAddress[1], pInvData->BTAddress[0]);
     // *** Start BT
-    SerialBT.begin("ESP32toSMA", true);   // "true" creates this device as a BT Master.
-    SerialBT.setPin(&BTPin[0]); 
+    smaInverter.begin("ESP32toSMA", true); // "true" creates this device as a BT Master.
   }
   // *** Start WIFI and WebServer
-
-
 
 } 
 
   // **** Loop ************
 void loop() { 
-  extern BluetoothSerial SerialBT;
+  smaInverterApp.appLoop();
+}
+
+void ESP32_SMA_Inverter_App::appLoop() { 
   int adjustedScanRate;
   // connect or reconnect after connection lost 
   if (nightTime)  // Scan every 15min
     adjustedScanRate = 900000;
   else
-    adjustedScanRate = (config.ScanRate * 1000);
-  if ( !smartConfig && (nextTime < millis()) && (!btConnected)) {
+    adjustedScanRate = (config.scanRate * 1000);
+  if ( !smartConfig && (nextTime < millis()) && (!smaInverter.isBtConnected())) {
     nextTime = millis() + adjustedScanRate;
     if(nightTime)
       DEBUG1_PRINT("Night time - 15min scans\n");
-
-    pcktID = 1;
+    smaInverter.setPcktID(1);//pcktID = 1;
+    
     // **** Connect SMA **********
     DEBUG1_PRINT("Connecting SMA inverter: \n");
-    if (SerialBT.connect(SmaBTAddress)) {
-      btConnected = true;
+    if (smaInverter.connect(smaBTAddress)) {
+      //btConnected = true;
       
       // **** Initialize SMA *******
       DEBUG1_PRINTLN("BT connected \n");
-      E_RC rc = initialiseSMAConnection();
+      E_RC rc = smaInverter.initialiseSMAConnection();
       DEBUG2_PRINTF("SMA %d \n",rc);
-      getBT_SignalStrength();
+      smaInverter.getBT_SignalStrength();
 
 #ifdef LOGOFF
       // not sure the purpose but SBfSpot code logs off before logging on and this has proved very reliable for me: mrtoy-me 
@@ -140,33 +123,34 @@ void loop() {
 #endif
       // **** logon SMA ************
       DEBUG1_PRINT("*** logonSMAInverter\n");
-      rc = logonSMAInverter(SmaInvPass, USERGROUP);
+      rc = smaInverter.logonSMAInverter(smaInvPass, USERGROUP);
       DEBUG2_PRINTF("Logon return code %d\n",rc);
-      ReadCurrentData();
+      smaInverter.ReadCurrentData();
 #ifdef LOGOFF    
       //logoff before disconnecting
       logoffSMAInverter();
 #endif
       
-      SerialBT.disconnect();
+      smaInverter.disconnect(); //moved btConnected to inverter class
       
-    
-      btConnected = false;
       //Send Home Assistant autodiscover
       if(config.mqttBroker.length() > 0 && config.hassDisc && firstTime){
-        hassAutoDiscover();
-        logViaMQTT("First boot");
+        mqttInstanceForApp.hassAutoDiscover();
+        mqttInstanceForApp.logViaMQTT("First boot");
         firstTime=false;
         delay(5000);
       }
 
-      nightTime = publishData();
+      nightTime = mqttInstanceForApp.publishData();
     } else {  
-      logViaMQTT("Bluetooth failed to connect");
+      mqttInstanceForApp.logViaMQTT("Bluetooth failed to connect");
     } 
   }
   // DEBUG1_PRINT(".");
-  wifiLoop();
+  mqttInstanceForApp.wifiLoop();
     
   delay(100);
 }
+
+
+
