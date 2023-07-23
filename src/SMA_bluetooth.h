@@ -28,6 +28,7 @@ SOFTWARE.
 #define SMA_BLUETOOTH.H
 
 
+#include <Arduino.h>
 
 //unsigned char EspBTAddress[6] = {0xE6,0x72,0xCC,0xD1,0x08,0xF0}; // BT address ESP32 F0:08:D1:CC:72:E6
 //                        \|E6\|72\|CC\|D1\|08\|F0 };  // BT address  ESP32 F0:08:D1:CC:72:E6

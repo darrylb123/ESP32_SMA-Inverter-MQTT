@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#include <Arduino.h>
 #include <Esp.h>
-#include "Arduino.h"
 #include "BluetoothSerial.h"
 //#define RX_QUEUE_SIZE 2048
 //#define TX_QUEUE_SIZE 64

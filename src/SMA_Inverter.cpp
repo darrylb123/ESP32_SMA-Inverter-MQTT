@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#include <Arduino.h>
 #include "SMA_Inverter.h"
-
 
 int32_t  value32 = 0;
 int64_t  value64 = 0;

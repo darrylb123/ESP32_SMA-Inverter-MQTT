@@ -1,6 +1,9 @@
 #ifndef CONFIG.H
 #define CONFIG.H
 
+#include <Arduino.h>
+#include "config_values.h"
+
 //*** debug ****************
 // 0=no Debug; 
 // 1=values only; 

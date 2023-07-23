@@ -25,6 +25,9 @@ SOFTWARE.
 #ifndef SMA_INVERTER.H
 #define SMA_INVERTER.H
 
+
+#include <Arduino.h>
+
 #define tokWh(value64)    (double)(value64)/1000
 #define tokW(value32)     (float)(value32)/1000
 #define toHour(value64)   (double)(value64)/3600
