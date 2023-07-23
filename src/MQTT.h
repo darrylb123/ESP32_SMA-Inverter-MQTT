@@ -10,9 +10,9 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include <WebServer.h>
+#include "ESP32Loggable.h"
 
-
-class ESP32_SMA_MQTT {
+class ESP32_SMA_MQTT : public ESP32Loggable  {
 
 public:
     // Static method to get the instance of the class.
@@ -42,7 +42,7 @@ public:
 
 private:
     // Private constructor to prevent instantiation from outside the class.
-    ESP32_SMA_MQTT() {}
+    ESP32_SMA_MQTT() : ESP32Loggable("ESP32_SMA_MQTT") {}
 
     // Destructor (optional, as the singleton instance will be destroyed when the program ends).
     ~ESP32_SMA_MQTT() {}

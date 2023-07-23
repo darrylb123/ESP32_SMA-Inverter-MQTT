@@ -8,17 +8,19 @@
 
 #include "ESP32_SMA_Inverter_App_Config.h"
 #include "SMA_Inverter.h"
+#include "ESP32Loggable.h"
 
 
-class ESP32_SMA_Inverter_App  {
+class ESP32_SMA_Inverter_App : public ESP32Loggable {
 
     public:
-        ESP32_SMA_Inverter_App() {
+        ESP32_SMA_Inverter_App() :  ESP32Loggable("ESP32_SMA_Inverter_App") {
         };
 
     void appSetup();
     void appLoop();
     void wifiStartup();
+    void logBuild();
 
     static const uint16_t appSUSyID = 125;
     static uint32_t appSerial ;

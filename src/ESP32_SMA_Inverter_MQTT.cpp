@@ -30,6 +30,9 @@ SOFTWARE.
 #include <PubSubClient.h>
 //#define RX_QUEUE_SIZE 2048
 //#define TX_QUEUE_SIZE 64
+#include <logging.hpp>
+#include <ets-appender.hpp>
+#include <udp-appender.hpp>
 
 #include "SMA_Utils.h"
 #include "SMA_bluetooth.h"
@@ -39,7 +42,7 @@ SOFTWARE.
 #include "ESP32_SMA_Inverter_MQTT.h"
 
 ESP32_SMA_Inverter_App smaInverterApp = ESP32_SMA_Inverter_App();
-ESP32_SMA_Inverter smaInverter = ESP32_SMA_Inverter();
+ESP32_SMA_Inverter& smaInverter = ESP32_SMA_Inverter::getInstance();
 //ESP32_SMA_MQTT mqtt = ESP32_SMA_MQTT();
 
 uint32_t ESP32_SMA_Inverter_App::appSerial=0;
@@ -53,7 +56,20 @@ ESP32_SMA_Inverter_App_Config& inverterAppConfig =  ESP32_SMA_Inverter_App_Confi
 int ESP32_SMA_Inverter_App::smartConfig = 0;
 
 void setup() { 
+
+  Logging::setLevel(esp32m::Info);
+  Logging::addAppender(&ETSAppender::instance());
+#ifdef SYSLOG_HOST
+  udpappender.setMode(UDPAppender::Format::Syslog);
+  Logging::addAppender(&udpappender);
+#endif
+  Serial.println("added appenders");
+  smaInverterApp.logBuild();
   smaInverterApp.appSetup();
+}
+
+void ESP32_SMA_Inverter_App::logBuild() {
+  logW("v1 Build 2w d (%s) t (%s) "  ,__DATE__ , __TIME__) ; 
 }
 
 void ESP32_SMA_Inverter_App::appSetup() { 
@@ -62,6 +78,11 @@ void ESP32_SMA_Inverter_App::appSetup() {
   inverterAppConfig.configSetup();
   mqttInstanceForApp.wifiStartup();
   
+  InverterData& invData = ESP32_SMA_Inverter::getInstance().invData;
+  DisplayData& dispData = ESP32_SMA_Inverter::getInstance().dispData;  
+  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
+
+
   if ( !smartConfig) {
     // Convert the MAC address string to binary
     sscanf(config.smaBTAddress.c_str(), "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", 
@@ -71,16 +92,14 @@ void ESP32_SMA_Inverter_App::appSetup() {
        smaInvPass[i] ='\0';
     strlcpy(smaInvPass , config.smaInvPass.c_str(), sizeof(smaInvPass));
 
-    InverterData *pInvData = ESP32_SMA_Inverter::pInvData;
-
-    pInvData->SUSyID = 0x7d;
-    pInvData->Serial = 0;
+    invData.SUSyID = 0x7d;
+    invData.Serial = 0;
     nextTime = millis();
     // reverse inverter BT address
-    for(uint8_t i=0; i<6; i++) pInvData->BTAddress[i] = smaBTAddress[5-i];
-    DEBUG2_PRINTF("pInvData->BTAddress: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                pInvData->BTAddress[5], pInvData->BTAddress[4], pInvData->BTAddress[3],
-                pInvData->BTAddress[2], pInvData->BTAddress[1], pInvData->BTAddress[0]);
+    for(uint8_t i=0; i<6; i++) invData.BTAddress[i] = smaBTAddress[5-i];
+    logD("invData.BTAddress: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                invData.BTAddress[5], invData.BTAddress[4], invData.BTAddress[3],
+                invData.BTAddress[2], invData.BTAddress[1], invData.BTAddress[0]);
     // *** Start BT
     smaInverter.begin("ESP32toSMA", true); // "true" creates this device as a BT Master.
   }
@@ -103,18 +122,18 @@ void ESP32_SMA_Inverter_App::appLoop() {
   if ( !smartConfig && (nextTime < millis()) && (!smaInverter.isBtConnected())) {
     nextTime = millis() + adjustedScanRate;
     if(nightTime)
-      DEBUG1_PRINT("Night time - 15min scans\n");
+      logW("Night time - 15min scans\n");
     smaInverter.setPcktID(1);//pcktID = 1;
     
     // **** Connect SMA **********
-    DEBUG1_PRINT("Connecting SMA inverter: \n");
+    logW("Connecting SMA inverter: \n");
     if (smaInverter.connect(smaBTAddress)) {
       //btConnected = true;
       
       // **** Initialize SMA *******
-      DEBUG1_PRINTLN("BT connected \n");
+      logW("BT connected \n");
       E_RC rc = smaInverter.initialiseSMAConnection();
-      DEBUG2_PRINTF("SMA %d \n",rc);
+      logI("SMA %d \n",rc);
       smaInverter.getBT_SignalStrength();
 
 #ifdef LOGOFF
@@ -122,9 +141,9 @@ void ESP32_SMA_Inverter_App::appLoop() {
       logoffSMAInverter();
 #endif
       // **** logon SMA ************
-      DEBUG1_PRINT("*** logonSMAInverter\n");
+      logW("*** logonSMAInverter\n");
       rc = smaInverter.logonSMAInverter(smaInvPass, USERGROUP);
-      DEBUG2_PRINTF("Logon return code %d\n",rc);
+      logI("Logon return code %d\n",rc);
       smaInverter.ReadCurrentData();
 #ifdef LOGOFF    
       //logoff before disconnecting

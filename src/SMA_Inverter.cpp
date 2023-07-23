@@ -41,8 +41,8 @@ const char btPin[] = {'0','0','0','0',0}; // BT pin Always 0000. (not login pass
 
 InverterData ESP32_SMA_Inverter::invData = InverterData();
 DisplayData ESP32_SMA_Inverter::dispData = DisplayData();
-InverterData* ESP32_SMA_Inverter::pInvData = &ESP32_SMA_Inverter::invData;
-DisplayData* ESP32_SMA_Inverter::pDispData = &ESP32_SMA_Inverter::dispData;
+//InverterData* ESP32_SMA_Inverter::pInvData = &ESP32_SMA_Inverter::invData;
+//DisplayData* ESP32_SMA_Inverter::pDispData = &ESP32_SMA_Inverter::dispData;
 
 
 bool ESP32_SMA_Inverter::begin(String localName, bool isMaster) {
@@ -219,10 +219,10 @@ E_RC ESP32_SMA_Inverter::getInverterDataCfl(uint32_t command, uint32_t first, ui
   //extern uint8_t sixff[6];
     pcktID++;
     writePacketHeader(pcktBuf, 0x01, sixff); //addr_unknown);
-    //if (pInvData->SUSyID == SID_SB240)
-    //writePacket(pcktBuf, 0x09, 0xE0, 0, pInvData->SUSyID, pInvData->Serial);
+    //if (invData.SUSyID == SID_SB240)
+    //writePacket(pcktBuf, 0x09, 0xE0, 0, invData.SUSyID, invData.Serial);
     //else
-    writePacket(pcktBuf, 0x09, 0xA0, 0, pInvData->SUSyID, pInvData->Serial);
+    writePacket(pcktBuf, 0x09, 0xA0, 0, invData.SUSyID, invData.Serial);
     write32(pcktBuf, command);
     write32(pcktBuf, first);
     write32(pcktBuf, last);
@@ -236,20 +236,20 @@ E_RC ESP32_SMA_Inverter::getInverterDataCfl(uint32_t command, uint32_t first, ui
     bool  validPcktID = false;
     do {
     do {
-      pInvData->status = getPacket(pInvData->BTAddress, 0x0001);
+      invData.status = getPacket(invData.BTAddress, 0x0001);
    
-      if (pInvData->status != E_OK) return pInvData->status;
+      if (invData.status != E_OK) return invData.status;
       if (validateChecksum()) {
-        if ((pInvData->status = (E_RC)get_u16(pcktBuf + 23)) != E_OK) {
-          DEBUG2_PRINTF("Packet status: 0x%02X\n", pInvData->status);
-          return pInvData->status;
+        if ((invData.status = (E_RC)get_u16(pcktBuf + 23)) != E_OK) {
+          DEBUG2_PRINTF("Packet status: 0x%02X\n", invData.status);
+          return invData.status;
         }
         // *** analyze received data ***
         pcktcount = get_u16(pcktBuf + 25);
         uint16_t rcvpcktID = get_u16(pcktBuf + 27) & 0x7FFF;
         if (pcktID == rcvpcktID) {
-          if ((get_u16(pcktBuf + 15) == pInvData->SUSyID) 
-            && (get_u32(pcktBuf + 17) == pInvData->Serial)) {
+          if ((get_u16(pcktBuf + 15) == invData.SUSyID) 
+            && (get_u32(pcktBuf + 17) == invData.Serial)) {
             validPcktID = true;
             value32 = 0;
             value64 = 0;
@@ -279,108 +279,108 @@ E_RC ESP32_SMA_Inverter::getInverterDataCfl(uint32_t command, uint32_t first, ui
               switch (lri) {
               case GridMsTotW: //SPOT_PACTOT
                   //This function gives us the time when the inverter was switched off
-                  pInvData->LastTime = datetime;
-                  pInvData->Pac = value32;
-                  pDispData->Pac = tokW(value32);
+                  invData.LastTime = datetime;
+                  invData.Pac = value32;
+                  dispData.Pac = tokW(value32);
                   //debug_watt("SPOT_PACTOT", value32, datetime);
                   printUnixTime(timeBuf, datetime);
                   DEBUG1_PRINTF("Pac %15.3f kW %x \n GMT:%s \n", tokW(value32),value32, timeBuf);
                   break;
        
               case GridMsWphsA: //SPOT_PAC1
-                  pInvData->Pmax = value32;
-                  pDispData->Pmax = tokW(value32);
+                  invData.Pmax = value32;
+                  dispData.Pmax = tokW(value32);
                   //debug_watt("SPOT_PAC1", value32, datetime);
                   DEBUG1_PRINTF("Pmax %14.2f kW \n", tokW(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case GridMsPhVphsA: //SPOT_UAC1
-                  pInvData->Uac[0] = value32;
-                  pDispData->Uac[0] = toVolt(value32);
+                  invData.Uac[0] = value32;
+                  dispData.Uac[0] = toVolt(value32);
                   //debug_volt("SPOT_UAC1", value32, datetime);
                   DEBUG1_PRINTF("UacA %15.2f V  \n", toVolt(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;
               case GridMsPhVphsB: //SPOT_UAC2
-                  pInvData->Uac[1] = value32;
-                  pDispData->Uac[1] = toVolt(value32);
+                  invData.Uac[1] = value32;
+                  dispData.Uac[1] = toVolt(value32);
                   //debug_volt("SPOT_UAC1", value32, datetime);
                   DEBUG1_PRINTF("UacB %15.2f V  \n", toVolt(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;     
                 case GridMsPhVphsC: //SPOT_UAC2
-                  pInvData->Uac[2] = value32;
-                  pDispData->Uac[2] = toVolt(value32);
+                  invData.Uac[2] = value32;
+                  dispData.Uac[2] = toVolt(value32);
                   //debug_volt("SPOT_UAC1", value32, datetime);
                   DEBUG1_PRINTF("UacC %15.2f V  \n", toVolt(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;       
               case GridMsAphsA_1: //SPOT_IAC1
               case GridMsAphsA:
-                  pInvData->Iac[0] = value32;
-                  pDispData->Iac[0] = toAmp(value32);
+                  invData.Iac[0] = value32;
+                  dispData.Iac[0] = toAmp(value32);
                   //debug_amp("SPOT_IAC1", value32, datetime);
                   DEBUG1_PRINTF("IacA %15.2f A  \n", toAmp(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;
               case GridMsAphsB_1: //SPOT_IAC1
               case GridMsAphsB:
-                  pInvData->Iac[1] = value32;
-                  pDispData->Iac[1] = toAmp(value32);
+                  invData.Iac[1] = value32;
+                  dispData.Iac[1] = toAmp(value32);
                   //debug_amp("SPOT_IAC1", value32, datetime);
                   DEBUG1_PRINTF("IacB %15.2f A  \n", toAmp(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;
               case GridMsAphsC_1: //SPOT_IAC1
               case GridMsAphsC:
-                  pInvData->Iac[2] = value32;
-                  pDispData->Iac[2] = toAmp(value32);
+                  invData.Iac[2] = value32;
+                  dispData.Iac[2] = toAmp(value32);
                   //debug_amp("SPOT_IAC1", value32, datetime);
                   DEBUG1_PRINTF("IacB %15.2f A  \n", toAmp(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case GridMsHz: //SPOT_FREQ
-                  pInvData->Freq = value32;
-                  pDispData->Freq = toHz(value32);
+                  invData.Freq = value32;
+                  dispData.Freq = toHz(value32);
                   DEBUG1_PRINTF("Freq %14.2f Hz \n", toHz(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case DcMsWatt: //SPOT_PDC1 / SPOT_PDC2
-                  pInvData->Wdc[string[0]] = value32;
-                  pDispData->Wdc[string[0]++] = tokW(value32);
+                  invData.Wdc[string[0]] = value32;
+                  dispData.Wdc[string[0]++] = tokW(value32);
                   DEBUG1_PRINTF("PDC %15.2f kW \n", tokW(value32));
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case DcMsVol: //SPOT_UDC1 / SPOT_UDC2
                   DEBUG1_PRINTF("Udc %15.2f V (%d) \n", toVolt(value32),string[1]);
-                  pInvData->Udc[string[1]] = value32;
-                  pDispData->Udc[string[1]++] = toVolt(value32);
+                  invData.Udc[string[1]] = value32;
+                  dispData.Udc[string[1]++] = toVolt(value32);
                   
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case DcMsAmp: //SPOT_IDC1 / SPOT_IDC2
                   DEBUG1_PRINTF("Idc %15.2f A (%d)\n", toAmp(value32),string[2]);
-                  pInvData->Idc[string[2]] = value32;
-                  pDispData->Idc[string[2]++] = toAmp(value32);
+                  invData.Idc[string[2]] = value32;
+                  dispData.Idc[string[2]++] = toAmp(value32);
 
                   //printUnixTime(timeBuf, datetime);
-                  /* if ((pInvData->Udc[0]!=0) && (pInvData->Idc[0] != 0))
-                    pInvData->Eta = ((uint64_t)pInvData->Uac * (uint64_t)pInvData->Iac * 10000) /
-                                    ((uint64_t)pInvData->Udc[0] * (uint64_t)pInvData->Idc[0] );
-                  else pInvData->Eta = 0;
-                  DEBUG1_PRINTF("Efficiency %8.2f %%\n", toPercent(pInvData->Eta)); */
+                  /* if ((invData.Udc[0]!=0) && (invData.Idc[0] != 0))
+                    invData.Eta = ((uint64_t)invData.Uac * (uint64_t)invData.Iac * 10000) /
+                                    ((uint64_t)invData.Udc[0] * (uint64_t)invData.Idc[0] );
+                  else invData.Eta = 0;
+                  DEBUG1_PRINTF("Efficiency %8.2f %%\n", toPercent(invData.Eta)); */
                   break;
        
               case MeteringDyWhOut: //SPOT_ETODAY
                   //This function gives us the current inverter time
-                  //pInvData->InverterDatetime = datetime;
-                  pInvData->EToday = value64;
-                  pDispData->EToday = tokWh(value64);
+                  //invData.InverterDatetime = datetime;
+                  invData.EToday = value64;
+                  dispData.EToday = tokWh(value64);
                   //debug_kwh("SPOT_ETODAY", value64, datetime);
                   DEBUG1_PRINTF("E-Today %11.3f kWh\n", tokWh(value64));
                   //printUnixTime(timeBuf, datetime);
@@ -388,46 +388,46 @@ E_RC ESP32_SMA_Inverter::getInverterDataCfl(uint32_t command, uint32_t first, ui
        
               case MeteringTotWhOut: //SPOT_ETOTAL
                   //In case SPOT_ETODAY missing, this function gives us inverter time (eg: SUNNY TRIPOWER 6.0)
-                  //pInvData->InverterDatetime = datetime;
-                  pInvData->ETotal = value64;
-                  pDispData->ETotal = tokWh(value64);
+                  //invData.InverterDatetime = datetime;
+                  invData.ETotal = value64;
+                  dispData.ETotal = tokWh(value64);
                   //debug_kwh("SPOT_ETOTAL", value64, datetime);
                   DEBUG1_PRINTF("E-Total %11.3f kWh\n", tokWh(value64));
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case MeteringTotOpTms: //SPOT_OPERTM
-                  pInvData->OperationTime = value64;
+                  invData.OperationTime = value64;
                   //debug_hour("SPOT_OPERTM", value64, datetime);
                   DEBUG1_PRINTF("OperTime  %7.3f h \n", toHour(value64));
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case MeteringTotFeedTms: //SPOT_FEEDTM
-                  pInvData->FeedInTime = value64;
+                  invData.FeedInTime = value64;
                   //debug_hour("SPOT_FEEDTM", value64, datetime);
                   DEBUG1_PRINTF("FeedTime  %7.3f h  \n", toHour(value64));
                   //printUnixTime(timeBuf, datetime);
                   break;
        
               case CoolsysTmpNom:
-                  pInvData->InvTemp = value32;
-                  pDispData->InvTemp = toTemp(value32);
+                  invData.InvTemp = value32;
+                  dispData.InvTemp = toTemp(value32);
                   DEBUG1_PRINTF("Temp.     %7.3f C \n", toTemp(value32));
                   break;
               case OperationHealth:
-                  pInvData->DevStatus = value32;
+                  invData.DevStatus = value32;
                   DEBUG1_PRINTF("Device Status:    %d  \n", value32);
                   break;
               case OperationGriSwStt:
-                  pInvData->GridRelay = value32;
+                  invData.GridRelay = value32;
                   DEBUG1_PRINTF("Grid Relay:    %d  \n", value32);
                   break;
               case MeteringGridMsTotWOut:
-                  //pInvData->MeteringGridMsTotWOut = value32;
+                  //invData.MeteringGridMsTotWOut = value32;
                   break;
               case MeteringGridMsTotWIn:
-                  //pInvData->MeteringGridMsTotWIn = value32;
+                  //invData.MeteringGridMsTotWIn = value32;
                   break;
               default:
 
@@ -436,7 +436,7 @@ E_RC ESP32_SMA_Inverter::getInverterDataCfl(uint32_t command, uint32_t first, ui
             } //for
           } else {
             DEBUG3_PRINTF("*** Wrong SUSyID=%04x=%04x Serial=%08x=%08x", 
-                 get_u16(pcktBuf + 15), pInvData->SUSyID, get_u32(pcktBuf + 17),pInvData->Serial);
+                 get_u16(pcktBuf + 15), invData.SUSyID, get_u32(pcktBuf + 17),invData.Serial);
           }
         } else {  // wrong PacketID
           DEBUG3_PRINTF("PacketID mismatch: exp=0x%04X is=0x%04X\n", pcktID, rcvpcktID);
@@ -444,12 +444,12 @@ E_RC ESP32_SMA_Inverter::getInverterDataCfl(uint32_t command, uint32_t first, ui
           pcktcount = 0;
         }
       } else { // invalid Checksum
-        pInvData->status = E_CHKSUM;
-        return pInvData->status;
+        invData.status = E_CHKSUM;
+        return invData.status;
       }
    } while (pcktcount > 0);
    } while (!validPcktID);
-   return pInvData->status;
+   return invData.status;
 }
 // ***********************************************
 E_RC ESP32_SMA_Inverter::getInverterData(enum getInverterDataType type) {
@@ -593,15 +593,15 @@ E_RC ESP32_SMA_Inverter::getInverterData(enum getInverterDataType type) {
 //-------------------------------------------------------------------------
 bool ESP32_SMA_Inverter::getBT_SignalStrength() {
   DEBUG2_PRINT("\n\n*** SignalStrength ***");
-  writePacketHeader(pcktBuf, 0x03, pInvData->BTAddress);
+  writePacketHeader(pcktBuf, 0x03, invData.BTAddress);
   writeByte(pcktBuf,0x05);
   writeByte(pcktBuf,0x00);
   writePacketLength(pcktBuf);
   BTsendPacket(pcktBuf);
 
-  getPacket(pInvData->BTAddress, 4);
-  pDispData->BTSigStrength = ((float)btrdBuf[22] * 100.0f / 255.0f);
-  DEBUG1_PRINTF("BT-Signal %9.1f %%", pDispData->BTSigStrength );
+  getPacket(invData.BTAddress, 4);
+  dispData.BTSigStrength = ((float)btrdBuf[22] * 100.0f / 255.0f);
+  DEBUG1_PRINTF("BT-Signal %9.1f %%", dispData.BTSigStrength );
   return true;
 }
 
@@ -609,18 +609,18 @@ bool ESP32_SMA_Inverter::getBT_SignalStrength() {
 E_RC ESP32_SMA_Inverter::initialiseSMAConnection() {
   //extern uint8_t sixff[6];
   DEBUG2_PRINTLN(" -> Initialize");
-  getPacket(pInvData->BTAddress, 2); // 1. Receive
-  pInvData->NetID = pcktBuf[22];
-  DEBUG2_PRINTF("SMA netID=%02X\n", pInvData->NetID);
-  writePacketHeader(pcktBuf, 0x02, pInvData->BTAddress);
+  getPacket(invData.BTAddress, 2); // 1. Receive
+  invData.NetID = pcktBuf[22];
+  DEBUG2_PRINTF("SMA netID=%02X\n", invData.NetID);
+  writePacketHeader(pcktBuf, 0x02, invData.BTAddress);
   write32(pcktBuf, 0x00700400);
-  writeByte(pcktBuf, pInvData->NetID);
+  writeByte(pcktBuf, invData.NetID);
   write32(pcktBuf, 0);
   write32(pcktBuf, 1);
   writePacketLength(pcktBuf);
 
   BTsendPacket(pcktBuf);             // 1. Reply
-  ESP32_SMA_Inverter::getPacket(pInvData->BTAddress, 5); // 2. Receive
+  ESP32_SMA_Inverter::getPacket(invData.BTAddress, 5); // 2. Receive
 
   // Extract ESP32 BT address
   memcpy(espBTAddress, pcktBuf+26,6); 
@@ -638,14 +638,14 @@ E_RC ESP32_SMA_Inverter::initialiseSMAConnection() {
   writePacketLength(pcktBuf);
 
   BTsendPacket(pcktBuf);             // 2. Reply
-  if (getPacket(pInvData->BTAddress, 1) != E_OK) // 3. Receive
+  if (getPacket(invData.BTAddress, 1) != E_OK) // 3. Receive
     return E_INIT;
 
   if (!validateChecksum())
     return E_CHKSUM;
 
-  pInvData->Serial = get_u32(pcktBuf + 57);
-  DEBUG1_PRINTF("Serial Nr: %lu\n", pInvData->Serial);
+  invData.Serial = get_u32(pcktBuf + 57);
+  DEBUG1_PRINTF("Serial Nr: %lu\n", invData.Serial);
   return E_OK;
 }
 
@@ -699,9 +699,9 @@ E_RC ESP32_SMA_Inverter::logonSMAInverter(const char *password, const uint8_t us
     if (!validateChecksum()) return E_CHKSUM;
     uint16_t rcvpcktID = get_u16(pcktBuf+27) & 0x7FFF;
     if ((pcktID == rcvpcktID) && (get_u32(pcktBuf + 41) == now)) {
-      pInvData->SUSyID = get_u16(pcktBuf + 15);
-      pInvData->Serial = get_u32(pcktBuf + 17);
-      DEBUG3_PRINTF("Set:->SUSyID=0x%02X ->Serial=0x%02X ", pInvData->SUSyID, pInvData->Serial);
+      invData.SUSyID = get_u16(pcktBuf + 15);
+      invData.Serial = get_u32(pcktBuf + 17);
+      DEBUG3_PRINTF("Set:->SUSyID=0x%02X ->Serial=0x%02X ", invData.SUSyID, invData.Serial);
       validPcktID = true;
       uint8_t retcode = get_u16(pcktBuf + 23);
       // switch (retcode) {
@@ -732,17 +732,17 @@ E_RC ArchiveDayData(time_t startTime) {
   E_RC rc = E_OK;
 
   for (unsigned int i = 0; i<ARCH_DAY_SIZE; i++) {
-     pInvData->dayWh[i] = 0;
+     invData.dayWh[i] = 0;
   }
-  pInvData->hasDayData = false;
+  invData.hasDayData = false;
 
   int packetcount = 0;
   bool validPcktID = false;
 
   E_RC hasData = E_ARCHNODATA;
   pcktID++;
-  writePacketHeader(pcktBuf, 0x01, pInvData->BTAddress);
-  writePacket(pcktBuf, 0x09, 0xE0, 0, pInvData->SUSyID, pInvData->Serial);
+  writePacketHeader(pcktBuf, 0x01, invData.BTAddress);
+  writePacket(pcktBuf, 0x09, 0xE0, 0, invData.SUSyID, invData.Serial);
   write32(pcktBuf, 0x70000200);
   write32(pcktBuf, startTime - 300);
   write32(pcktBuf, startTime + 86100);
@@ -757,7 +757,7 @@ E_RC ArchiveDayData(time_t startTime) {
     dateTime = 0;
 
     do {
-      rc = getPacket(pInvData->BTAddress, 1);
+      rc = getPacket(invData.BTAddress, 1);
 
       if (rc != E_OK) {
          DEBUG3_PRINTF("\ngetPacket error=%d", rc);
@@ -779,15 +779,15 @@ E_RC ArchiveDayData(time_t startTime) {
             uint16_t idx =((dateTime/3600)%24 * 12)+((dateTime/60)%60/5); //h*12+min/5
 
             totalWh = get_u64(pcktBuf + x + 4);
-            if ((totalWh > 0) && (!pInvData->hasDayData)) { 
-              pInvData->DayStartTime = dateTime;
-              pInvData->hasDayData = true;
+            if ((totalWh > 0) && (!invData.hasDayData)) { 
+              invData.DayStartTime = dateTime;
+              invData.hasDayData = true;
               hasData = E_OK; 
               printUnixTime(timeBuf, dateTime); 
               DEBUG1_PRINTF("\nArchiveDayData %s", timeBuf);
             }
             if (idx < ARCH_DAY_SIZE) {
-              pInvData->dayWh[idx] = totalWh;
+              invData.dayWh[idx] = totalWh;
               value64 = (totalWh - totalWh_prev) * 60 / 5; // assume 5 min. interval
               DEBUG3_PRINTF("[%03u] %6llu Wh %6llu W\n", idx, totalWh, value64);
             }
@@ -803,13 +803,13 @@ E_RC ArchiveDayData(time_t startTime) {
   } while (!validPcktID);
 
   /* print values
-  time_t startT = pInvData->DayStartTime;
+  time_t startT = invData.DayStartTime;
   printUnixTime(timeBuf, startT);
   DEBUG2_PRINTF("Day History: %s\n", timeBuf);
   totalWh_prev = 0;
 
   for (uint16_t i = 0; i<ARCH_DAY_SIZE; i++) {
-    totalWh = pInvData->dayWh[i];
+    totalWh = invData.dayWh[i];
     value32=0;
     if ((totalWh>0) && (totalWh_prev>0)) {
       value32 = (uint32_t)((totalWh - totalWh_prev)*60/5); 

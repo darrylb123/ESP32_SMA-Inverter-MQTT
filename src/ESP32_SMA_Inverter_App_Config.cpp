@@ -3,6 +3,8 @@
 #include <ArduinoJson.h>
 #include <FS.h>
 #include <LittleFS.h>
+#include "ESP32Loggable.h"
+#include <logging.hpp>
 
 #include <WiFi.h>
 #include <WebServer.h>
@@ -12,6 +14,7 @@
 #include <PubSubClient.h>
 
 #include "ESP32_SMA_Inverter_App_Config.h"
+
 
 
 
@@ -39,7 +42,7 @@ void ESP32_SMA_Inverter_App_Config::loadConfiguration(const char *filename) {
   // Deserialize the JSON document
   DeserializationError error = deserializeJson(doc, file);
   if (error)
-    Serial.println(F("Failed to read file, using default configuration"));
+    logE("Failed to read file, using default configuration");
 
   // Copy values from the JsonDocument to the Config         
   appConfig.mqttBroker =     doc["mqttBroker"] | "";
@@ -65,14 +68,14 @@ void ESP32_SMA_Inverter_App_Config::saveConfiguration(const char *configFile) {
   // Open file for writing
   File file = LittleFS.open(configFile, "w");
   if (!file) {
-    Serial.println(F("Failed to create file"));
+    logE("Failed to create file");
     return;
   }
 
   // Allocate a temporary JsonDocument
   // Don't forget to change the capacity to match your requirements.
   // Use arduinojson.org/assistant to compute the capacity.
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
 
   // Set the values in the document
   doc["mqttBroker"] = appConfig.mqttBroker;
@@ -87,7 +90,7 @@ void ESP32_SMA_Inverter_App_Config::saveConfiguration(const char *configFile) {
   doc["hassDisc"] = appConfig.hassDisc;
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
-    Serial.println(F("Failed to write to file"));
+    logE("Failed to write to file");
   }
 
   // Close the file
@@ -99,7 +102,7 @@ void ESP32_SMA_Inverter_App_Config::printFile(const char *configFile) {
   // Open file for reading
   File file = LittleFS.open(configFile,"r");
   if (!file) {
-    Serial.println(F("Failed to read file"));
+    logE("Failed to read file");
     return;
   }
 
@@ -114,32 +117,29 @@ void ESP32_SMA_Inverter_App_Config::printFile(const char *configFile) {
 }
 
 void ESP32_SMA_Inverter_App_Config::configSetup() {
-  // Initialize serial port
-  Serial.begin(115200);
-  while (!Serial) continue;
   
   if (!LittleFS.begin(FORMAT_LITTLEFS_IF_FAILED)) {
-    Serial.println(F("LittleFS mount failed"));
+    logE("LittleFS mount failed");
     return;
   }
 
   // Should load default config if run for the first time
-  Serial.println(F("Loading configuration..."));
+  log_w("Loading configuration...");
   loadConfiguration(confFile);
 
   // Create configuration file
-  Serial.println(F("Saving configuration..."));
+  log_w("Saving configuration...");
   saveConfiguration(confFile);
 
   // Dump config file
- Serial.println(F("Print config file..."));
+  log_w("Print config file...");
   printFile(confFile);
 }
 
 void ESP32_SMA_Inverter_App_Config::rmfiles(){
   if (LittleFS.remove("/config.txt")) {
-    Serial.println("/config.txt removed");
+    log_w("/config.txt removed");
   } else {
-    Serial.println("/config.txt removal failed");
+    log_e("/config.txt removal failed");
   }
 }

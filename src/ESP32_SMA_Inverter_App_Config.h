@@ -2,6 +2,7 @@
 #ifndef ESP32_SMA_INVERTER_CONFIG_H
 #define ESP32_SMA_INVERTER_CONFIG_H
 
+#include "ESP32Loggable.h"
 
 //#include "config_values.h"
 
@@ -42,7 +43,7 @@ struct AppConfig {
 };
 
 
-class ESP32_SMA_Inverter_App_Config  {
+class ESP32_SMA_Inverter_App_Config : public ESP32Loggable {
 
   public: 
     // Static method to get the instance of the class.
@@ -69,16 +70,16 @@ class ESP32_SMA_Inverter_App_Config  {
      void rmfiles();
 
      AppConfig appConfig ;
-     AppConfig *pConfig = &appConfig;
+     //AppConfig *pConfig = &appConfig;
 
   protected:
   
 
   private: 
       // Private constructor to prevent instantiation from outside the class.
-    ESP32_SMA_Inverter_App_Config() {
+    ESP32_SMA_Inverter_App_Config() :  ESP32Loggable("ESP32_SMA_Inverter_App_Config") {
       appConfig = AppConfig();
-      pConfig = &appConfig;
+      //pConfig = &appConfig;
 
     }
 

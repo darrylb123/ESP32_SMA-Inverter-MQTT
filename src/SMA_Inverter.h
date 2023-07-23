@@ -214,8 +214,20 @@ typedef struct __attribute__ ((packed)) PacketHeader {
 
 class ESP32_SMA_Inverter : public ESP32_SMA_Bluetooth {
   public: 
-    ESP32_SMA_Inverter() : ESP32_SMA_Bluetooth() {
-    };
+    
+    // Static method to get the instance of the class.
+    static ESP32_SMA_Inverter& getInstance() {
+        // This guarantees that the instance is created only once.
+        static ESP32_SMA_Inverter instance;
+        return instance;
+    }
+
+    // Delete the copy constructor and the assignment operator to prevent cloning.
+    ESP32_SMA_Inverter(const ESP32_SMA_Inverter&) = delete;
+    ESP32_SMA_Inverter& operator=(const ESP32_SMA_Inverter&) = delete;
+
+
+
 
     //Prototypes
     bool isValidSender(uint8_t expAddr[6], uint8_t isAddr[6]);
@@ -241,11 +253,17 @@ class ESP32_SMA_Inverter : public ESP32_SMA_Bluetooth {
     bool begin(String localName, bool isMaster);
 
     static InverterData invData;
-    static InverterData *pInvData;// = &invData;
+    //static InverterData *pInvData;// = &invData;
     static DisplayData dispData;
-    static DisplayData *pDispData;// = &dispData;
+    //static DisplayData *pDispData;// = &dispData;
 
   private: 
+   // Private constructor to prevent instantiation from outside the class.
+    ESP32_SMA_Inverter() : ESP32_SMA_Bluetooth() {}
+    // Destructor (optional, as the singleton instance will be destroyed when the program ends).
+    ~ESP32_SMA_Inverter() {}
+
+
     uint8_t  btrdBuf[256];    
     uint16_t pcktBufMax = 0; // max. used size of PcktBuf
     uint8_t  espBTAddress[6]; // is retrieved from BT packet
