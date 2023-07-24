@@ -29,6 +29,7 @@ SOFTWARE.
 #include "ESP32_SMA_Inverter_MQTT.h"
 #include "ESP32_SMA_Inverter_App_Config.h"
 #include "config_values.h"
+#include "ESP32Loggable.h"
 
 #define FORMAT_LITTLEFS_IF_FAILED 
 
@@ -296,8 +297,8 @@ void ESP32_SMA_MQTT::handleForm() {
       } 
 
     }
-    ESP32_SMA_Inverter_App_Config::getInstance().saveConfiguration(confFile);
-    ESP32_SMA_Inverter_App_Config::getInstance().printFile(confFile);
+    ESP32_SMA_Inverter_App_Config::getInstance().saveConfiguration();
+    ESP32_SMA_Inverter_App_Config::getInstance().printFile();
     delay(3000);
     ESP.restart();
   }
@@ -308,29 +309,27 @@ void ESP32_SMA_MQTT::brokerConnect() {
   if(config.mqttBroker.length() < 1 ){
     return;
   }
-  DEBUG1_PRINT("\nConnecting to MQTT Broker\n");
+  log_w("Connecting to MQTT Broker");
 
   ESP32_SMA_Inverter_App::client.setServer(config.mqttBroker.c_str(), config.mqttPort);
 
   // client.setCallback(callback);
   for(int i =0; i < 3;i++) {
     if ( !ESP32_SMA_Inverter_App::client.connected()){
-      DEBUG1_PRINTF("The client %s connects to the mqtt broker %s ", sapString,config.mqttBroker.c_str());
+      log_w("The client %s connects to the mqtt broker %s ", mqttInstance.sapString, config.mqttBroker.c_str());
       // If there is a user account
       if(config.mqttUser.length() > 1){
-        DEBUG1_PRINT(" with user/password\n");
+        log_w(" with user/password\n");
         if (ESP32_SMA_Inverter_App::client.connect(mqttInstance.sapString,config.mqttUser.c_str(),config.mqttPasswd.c_str())) {
         } else {
-          Serial.print("mqtt connect failed with state ");
-          Serial.print(ESP32_SMA_Inverter_App::client.state());
+          log_e("mqtt connect failed with state %i",ESP32_SMA_Inverter_App::client.state());
           delay(2000);
         }
       } else {
-        DEBUG1_PRINT(" without user/password\n");
+        log_w(" without user/password ");
         if (ESP32_SMA_Inverter_App::client.connect(mqttInstance.sapString)) {
         } else {
-          Serial.print("mqtt connect failed with state ");
-          Serial.print(ESP32_SMA_Inverter_App::client.state());
+          log_e("mqtt connect failed with state %i", ESP32_SMA_Inverter_App::client.state());
           delay(2000);
         }
       }
@@ -397,7 +396,7 @@ bool ESP32_SMA_MQTT::publishData(){
     return(true);
 }
 
-void ESP32_SMA_MQTT::logViaMQTT(char *logStr){
+void ESP32_SMA_MQTT::logViaMQTT(const char *logStr){
   InverterData& invData = ESP32_SMA_Inverter::getInstance().invData;
   DisplayData& dispData = ESP32_SMA_Inverter::getInstance().dispData;  
   AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
@@ -485,7 +484,7 @@ void ESP32_SMA_MQTT::hassAutoDiscover(){
   sendLongMQTT(topic,"Log",tmpstr);
 }
 
-void ESP32_SMA_MQTT::sendLongMQTT(char *topic, char *postscript, char *msg){
+void ESP32_SMA_MQTT::sendLongMQTT(const char *topic, const char *postscript, const char *msg){
   int len = strlen(msg);
   char tmpstr[100];
   snprintf(tmpstr,sizeof(tmpstr),"homeassistant/sensor/%s-%s/config",topic,postscript);

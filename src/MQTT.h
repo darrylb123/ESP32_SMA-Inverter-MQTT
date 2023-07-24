@@ -37,8 +37,12 @@ public:
     static void brokerConnect();
     static bool publishData();
     static void hassAutoDiscover();
-    static void sendLongMQTT(char *topic, char *postscript, char *msg);
-    static void logViaMQTT(char *logStr);
+    static void sendLongMQTT(const char *topic, const char *postscript, const char *msg);
+    static void logViaMQTT(const char *logStr);
+
+        char sapString[21];
+        unsigned long previousMillis = 0;
+        unsigned long interval = 30000;
 
 private:
     // Private constructor to prevent instantiation from outside the class.
@@ -48,10 +52,6 @@ private:
     ~ESP32_SMA_MQTT() {}
 
 
-    protected:        
-        char sapString[21];
-        unsigned long previousMillis = 0;
-        unsigned long interval = 30000;
 
 };
 

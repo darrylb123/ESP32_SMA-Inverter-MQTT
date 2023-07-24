@@ -15,6 +15,11 @@ class ESP32_SMA_Inverter_App : public ESP32Loggable {
 
     public:
         ESP32_SMA_Inverter_App() :  ESP32Loggable("ESP32_SMA_Inverter_App") {
+            config = AppConfig();
+            strcpy(smaInvPass, "0000");
+            for (int i=0;i<6;i++) {
+                smaBTAddress[i]='0';
+            }
         };
 
     void appSetup();
