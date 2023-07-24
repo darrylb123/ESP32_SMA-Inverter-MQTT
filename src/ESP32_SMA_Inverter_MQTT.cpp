@@ -81,12 +81,12 @@ void ESP32_SMA_Inverter_App::appSetup() {
 
   if ( !smartConfig) {
     // Convert the MAC address string to binary
-    sscanf(config.smaBTAddress.c_str(), "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", 
+    sscanf(appConfig.smaBTAddress.c_str(), "%2hhx:%2hhx:%2hhx:%2hhx:%2hhx:%2hhx", 
             &smaBTAddress[0], &smaBTAddress[1], &smaBTAddress[2], &smaBTAddress[3], &smaBTAddress[4], &smaBTAddress[5]);
     // Zero the array, all unused butes must be 0
     for(int i = 0; i < sizeof(smaInvPass);i++)
        smaInvPass[i] ='\0';
-    strlcpy(smaInvPass , config.smaInvPass.c_str(), sizeof(smaInvPass));
+    strlcpy(smaInvPass , appConfig.smaInvPass.c_str(), sizeof(smaInvPass));
 
     invData.SUSyID = 0x7d;
     invData.Serial = 0;
@@ -114,7 +114,7 @@ void ESP32_SMA_Inverter_App::appLoop() {
   if (nightTime)  // Scan every 15min
     adjustedScanRate = 900000;
   else
-    adjustedScanRate = (config.scanRate * 1000);
+    adjustedScanRate = (appConfig.scanRate * 1000);
   if ( !smartConfig && (nextTime < millis()) && (!smaInverter.isBtConnected())) {
     nextTime = millis() + adjustedScanRate;
     if(nightTime)
@@ -149,7 +149,7 @@ void ESP32_SMA_Inverter_App::appLoop() {
       smaInverter.disconnect(); //moved btConnected to inverter class
       
       //Send Home Assistant autodiscover
-      if(config.mqttBroker.length() > 0 && config.hassDisc && firstTime){
+      if(appConfig.mqttBroker.length() > 0 && appConfig.hassDisc && firstTime){
         mqttInstanceForApp.hassAutoDiscover();
         mqttInstanceForApp.logViaMQTT("First boot");
         firstTime=false;
@@ -184,12 +184,12 @@ void ESP32_SMA_Inverter_App::loadConfiguration() {
     log_e("Failed to read file, using default configuration");
 
   // Copy values from the JsonDocument to the Config         
-   String arr[] = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc"};
-   for (int i=0;i<arr->length();i++) {
-    String k = arr[i];
-    String v = doc[k];
-    log_w("load key: %s , value: %s", k, v);
-   }
+  std::vector<std::string> keyNames = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc"};
+  for (uint i=0;i<keyNames.size();i++) {
+    std::string k = keyNames[i];
+    std::string v = doc[k];
+    log_w("load key: %s , value: %s", k.c_str(), v.c_str());
+  }
 
   #ifdef SMA_WIFI_CONFIG_VALUES_H
     appConfig.mqttBroker =  doc["mqttBroker"] | MQTT_BROKER;
@@ -255,15 +255,13 @@ void ESP32_SMA_Inverter_App::saveConfiguration() {
   doc["smaBTAddress"] = appConfig.smaBTAddress;
   doc["scanRate"] = appConfig.scanRate;
   doc["hassDisc"] = appConfig.hassDisc;
-
-  String arr[] = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc"};
-  
-   for (int i=0;i<arr->length();i++) {
-    String k = arr[i];
-    String v = doc[k];
-    log_w("save key: %s , value: %s", k, v);
-   }
-
+  std::vector<std::string> keyNames = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc"};
+  for (uint i=0;i<keyNames.size();i++) {
+    std::string k = keyNames[i];
+    std::string v = doc[k];
+    log_w("save key: %s , value: %s", k.c_str(), v.c_str());
+  }
+ 
   // Serialize JSON to file
   if (serializeJson(doc, file) == 0) {
     log_e("Failed to write to file");

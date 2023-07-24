@@ -73,6 +73,7 @@ class ESP32_SMA_Inverter_App : public ESP32Loggable {
     static WiFiClient espClient;
     static PubSubClient client;
 
+    AppConfig appConfig;
 
     //Prototypes
      void loadConfiguration();
@@ -81,8 +82,6 @@ class ESP32_SMA_Inverter_App : public ESP32Loggable {
      void configSetup();
      void rmfiles();
 
-     AppConfig appConfig ;
-
     protected:
       //extern BluetoothSerial serialBT;
         bool nightTime = false;
@@ -90,16 +89,15 @@ class ESP32_SMA_Inverter_App : public ESP32Loggable {
 
     private: 
         ESP32_SMA_Inverter_App() :  ESP32Loggable("ESP32_SMA_Inverter_App") {
-            config = AppConfig();
+            appConfig = AppConfig();
             strcpy(smaInvPass, "0000");
-            for (int i=0;i<6;i++) {
+            /*for (int i=0;i<6;i++) {
                 smaBTAddress[i]='0';
-            }
+            }*/
         };
 
         ~ESP32_SMA_Inverter_App() {}
 
-        AppConfig config;
         char smaInvPass[12];  
         uint8_t smaBTAddress[6]; // SMA bluetooth address
         //uint8_t  espBTAddress[6]; // is retrieved from BT packet

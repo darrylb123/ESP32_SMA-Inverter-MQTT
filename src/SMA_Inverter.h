@@ -27,6 +27,7 @@ SOFTWARE.
 
 
 #include "SMA_bluetooth.h"
+#include "ESP32Loggable.h"
 
 #define tokWh(value64)    (double)(value64)/1000
 #define tokW(value32)     (float)(value32)/1000
@@ -109,7 +110,7 @@ struct DisplayData {
   float Freq;
   float EToday;
   float ETotal;
-  char DevStatus[10];
+  //std::string DevStatus;
 };
 
 enum getInverterDataType {
@@ -212,7 +213,7 @@ typedef struct __attribute__ ((packed)) PacketHeader {
     uint16_t  command;
 } L1Hdr;
 
-class ESP32_SMA_Inverter : public ESP32_SMA_Bluetooth {
+class ESP32_SMA_Inverter : public ESP32_SMA_Bluetooth, ESP32Loggable {
   public: 
     
     // Static method to get the instance of the class.
@@ -259,7 +260,7 @@ class ESP32_SMA_Inverter : public ESP32_SMA_Bluetooth {
 
   private: 
    // Private constructor to prevent instantiation from outside the class.
-    ESP32_SMA_Inverter() : ESP32_SMA_Bluetooth() {}
+    ESP32_SMA_Inverter() : ESP32_SMA_Bluetooth(), ESP32Loggable("ESP32_SMA_Inverter") {}
     // Destructor (optional, as the singleton instance will be destroyed when the program ends).
     ~ESP32_SMA_Inverter() {}
 

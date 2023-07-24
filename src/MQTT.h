@@ -40,7 +40,7 @@ public:
      void sendLongMQTT(const char *topic, const char *postscript, const char *msg);
      void logViaMQTT(const char *logStr);
 
-    char sapString[21];
+    String sapString = "";
     unsigned long previousMillis = 0;
     unsigned long interval = 30000;
 

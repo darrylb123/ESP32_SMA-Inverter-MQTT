@@ -53,8 +53,10 @@ extern void E_handleForm() {
 
 void ESP32_SMA_MQTT::wifiStartup(){
   // Build Hostname
-  snprintf(mqttInstance.sapString, 20, "SMA-%08X", ESP.getEfuseMac());
-  logD(mqttInstance.sapString);
+  char sapString[20]="";
+  snprintf(sapString, 20, "SMA-%08X", ESP.getEfuseMac());
+  mqttInstance.sapString = String(sapString);
+  logD(mqttInstance.sapString.c_str());
 
   // Attempt to connect to the AP stored on board, if not, start in SoftAP mode
   WiFi.mode(WIFI_STA);
@@ -91,7 +93,7 @@ void ESP32_SMA_MQTT::wifiStartup(){
   ESP32_SMA_Inverter_App::smartConfig = 0; 
   String hostName = mqttInstance.sapString;
   logW("hostname %s", hostName);
-  logW("IP Address: %s", WiFi.localIP());
+  logW("IP Address: %s", ((String)WiFi.localIP().toString()).c_str());
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
   
@@ -180,7 +182,7 @@ void ESP32_SMA_MQTT::formPage () {
   AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
   char fulltopic[100];
 
-  responseHTML = (char *)malloc(10000);
+  responseHTML = (char *)malloc(sizeof(char)*10000);
   log_w("Connect formpage\n");
   strcpy(responseHTML, "<!DOCTYPE html><html><head>\
                       <title>SMA Inverter</title></head><body>\
@@ -263,6 +265,7 @@ table, th, td {\
   delay(100);// Serial.print(responseHTML);
   ESP32_SMA_Inverter_App::webServer.send(200, "text/html", responseHTML);
 
+  free(responseHTML);
 }
 
 // Function to extract the configuration
@@ -278,28 +281,23 @@ void ESP32_SMA_MQTT::handleForm() {
     for (uint8_t i = 0; i < ESP32_SMA_Inverter_App::webServer.args(); i++) {
       String name = ESP32_SMA_Inverter_App::webServer.argName(i);
       String v = ESP32_SMA_Inverter_App::webServer.arg(i);
+      v.trim();
       log_w("%s: %s ",name.c_str(), v.c_str());
       if (name == "mqttBroker") {
-        config.mqttBroker = v;
-        config.mqttBroker.trim();
+        config.mqttBroker = v.c_str();
       } else if (name == "mqttPort") {
-        String val = v;
+        String val = v.c_str();
         config.mqttPort = val.toInt();   
       } else if (name == "mqttUser") {
-        config.mqttUser = v;
-        config.mqttUser.trim();
+        config.mqttUser = v.c_str();
       } else if (name == "mqttPasswd") {
-        config.mqttPasswd = v;
-        config.mqttPasswd.trim();
+        config.mqttPasswd = v.c_str();
       } else if (name == "mqttTopic") {
-        config.mqttTopic = v;
-        config.mqttTopic.trim();
+        config.mqttTopic = v.c_str();
       } else if (name == "btaddress") {
-        config.smaBTAddress = v;
-        config.smaBTAddress.trim();
+        config.smaBTAddress = v.c_str();
       } else if (name == "smapw") {
-        config.smaInvPass = v;
-        config.smaInvPass.trim();
+        config.smaInvPass = v.c_str();
       } else if (name == "scanRate") {
         config.scanRate = atoi(v.c_str());
       } else if (name == "hassDisc") {
@@ -327,18 +325,18 @@ void ESP32_SMA_MQTT::brokerConnect() {
   // client.setCallback(callback);
   for(int i =0; i < 3;i++) {
     if ( !ESP32_SMA_Inverter_App::client.connected()){
-      log_w("The client %s connects to the mqtt broker %s ", mqttInstance.sapString, config.mqttBroker.c_str());
+      log_w("The client %s connects to the mqtt broker %s ", mqttInstance.sapString.c_str(), config.mqttBroker.c_str());
       // If there is a user account
       if(config.mqttUser.length() > 1){
         log_w(" with user/password\n");
-        if (ESP32_SMA_Inverter_App::client.connect(mqttInstance.sapString,config.mqttUser.c_str(),config.mqttPasswd.c_str())) {
+        if (ESP32_SMA_Inverter_App::client.connect(mqttInstance.sapString.c_str(),config.mqttUser.c_str(),config.mqttPasswd.c_str())) {
         } else {
           log_e("mqtt connect failed with state %i",ESP32_SMA_Inverter_App::client.state());
           delay(2000);
         }
       } else {
         log_w(" without user/password ");
-        if (ESP32_SMA_Inverter_App::client.connect(mqttInstance.sapString)) {
+        if (ESP32_SMA_Inverter_App::client.connect(mqttInstance.sapString.c_str())) {
         } else {
           log_e("mqtt connect failed with state %i", ESP32_SMA_Inverter_App::client.state());
           delay(2000);
@@ -389,15 +387,15 @@ bool ESP32_SMA_MQTT::publishData(){
       snprintf(topic,sizeof(topic), "homeassistant/sensor/%s-%d/state",config.mqttTopic.c_str(), invData.Serial);
     else
       snprintf(topic,sizeof(topic), "%s-%d/state",config.mqttTopic.c_str(), invData.Serial);
-    DEBUG1_PRINT(topic);
-    DEBUG1_PRINT(" = ");
-    DEBUG1_PRINTF("%s\n",theData);
+    logI(topic);
+    logI(" = ");
+    logI("%s\n",theData);
     int len = strlen(theData);
     ESP32_SMA_Inverter_App::client.beginPublish(topic,len,false);
     if (ESP32_SMA_Inverter_App::client.print(theData))
-      DEBUG1_PRINT("Published\n");
+      logI("Published\n");
     else
-      DEBUG1_PRINT("Failed Publish\n");
+      logW("Failed Publish\n");
     ESP32_SMA_Inverter_App::client.endPublish();
   }
   // If Power is zero, it's night time
@@ -424,15 +422,15 @@ void ESP32_SMA_MQTT::logViaMQTT(const char *logStr){
     // strcat(theData,"}");
     char topic[100];
     snprintf(topic,sizeof(topic), "homeassistant/sensor/%s-%d/state",config.mqttTopic.c_str(), invData.Serial);
-    DEBUG1_PRINT(topic);
-    DEBUG1_PRINT(" = ");
-    DEBUG1_PRINTF(" %s\n",tmp);
+    logI(topic);
+    logI(" = ");
+    logI(" %s\n",tmp);
     int len = strlen(tmp);
     ESP32_SMA_Inverter_App::client.beginPublish(topic,len,false);
     if (ESP32_SMA_Inverter_App::client.print(tmp))
-      DEBUG1_PRINT("Published\n");
+      logI("Published\n");
     else
-      DEBUG1_PRINT("Failed Publish\n");
+      logW("Failed Publish\n");
     ESP32_SMA_Inverter_App::client.endPublish();
   }
   
@@ -500,11 +498,11 @@ void ESP32_SMA_MQTT::sendLongMQTT(const char *topic, const char *postscript, con
   char tmpstr[100];
   snprintf(tmpstr,sizeof(tmpstr),"homeassistant/sensor/%s-%s/config",topic,postscript);
   ESP32_SMA_Inverter_App::client.beginPublish(tmpstr,len,true);
-  DEBUG1_PRINTF("%s -> %s... ",tmpstr,msg);
+  logI("%s -> %s... ",tmpstr,msg);
    if (ESP32_SMA_Inverter_App::client.print(msg))
-      DEBUG1_PRINT("Published\n");
+      logI("Published\n");
     else
-      DEBUG1_PRINT("Failed Publish\n");
+      logW("Failed Publish\n");
     ESP32_SMA_Inverter_App::client.endPublish();
     delay(200);
 }
