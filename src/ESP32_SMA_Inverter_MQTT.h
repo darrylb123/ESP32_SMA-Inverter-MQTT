@@ -6,21 +6,58 @@
 #include <WebServer.h>
 #include <PubSubClient.h>
 
-#include "ESP32_SMA_Inverter_App_Config.h"
 #include "SMA_Inverter.h"
 #include "ESP32Loggable.h"
+
+//#include "config_values.h"
+
+
+// Uncomment to logoff the inverter after each connection
+// Helps with connection reliabiolity on some inverters
+// #define LOGOFF true
+
+
+//*** debug ****************
+// 0=no Debug; 
+// 1=values only; 
+// 2=values and info and P-buffer
+// 3=values and info and T+R+P-buffer
+#define DEBUG_SMA 1
+
+// SMA login password for UG_USER or UG_INSTALLER always 12 char. Unused=0x00
+#define USERGROUP UG_USER
+
+
+struct AppConfig {
+    String mqttBroker;
+    uint16_t mqttPort;
+    String mqttUser;
+    String mqttPasswd;
+    String mqttTopic;
+    String smaInvPass;
+    String smaBTAddress;
+    int scanRate;
+    bool hassDisc;
+};
+
 
 
 class ESP32_SMA_Inverter_App : public ESP32Loggable {
 
     public:
-        ESP32_SMA_Inverter_App() :  ESP32Loggable("ESP32_SMA_Inverter_App") {
-            config = AppConfig();
-            strcpy(smaInvPass, "0000");
-            for (int i=0;i<6;i++) {
-                smaBTAddress[i]='0';
-            }
-        };
+
+        // Static method to get the instance of the class.
+        static ESP32_SMA_Inverter_App& getInstance() {
+            // This guarantees that the instance is created only once.
+            static ESP32_SMA_Inverter_App instance;
+            return instance;
+        }
+
+        // Delete the copy constructor and the assignment operator to prevent cloning.
+        ESP32_SMA_Inverter_App(const ESP32_SMA_Inverter_App&) = delete;
+        ESP32_SMA_Inverter_App& operator=(const ESP32_SMA_Inverter_App&) = delete;
+
+
 
     void appSetup();
     void appLoop();
@@ -36,11 +73,31 @@ class ESP32_SMA_Inverter_App : public ESP32Loggable {
     static WiFiClient espClient;
     static PubSubClient client;
 
+
+    //Prototypes
+     void loadConfiguration();
+     void saveConfiguration();
+     void printFile();
+     void configSetup();
+     void rmfiles();
+
+     AppConfig appConfig ;
+
     protected:
       //extern BluetoothSerial serialBT;
         bool nightTime = false;
         bool firstTime = true;
+
     private: 
+        ESP32_SMA_Inverter_App() :  ESP32Loggable("ESP32_SMA_Inverter_App") {
+            config = AppConfig();
+            strcpy(smaInvPass, "0000");
+            for (int i=0;i<6;i++) {
+                smaBTAddress[i]='0';
+            }
+        };
+
+        ~ESP32_SMA_Inverter_App() {}
 
         AppConfig config;
         char smaInvPass[12];  
@@ -49,8 +106,15 @@ class ESP32_SMA_Inverter_App : public ESP32Loggable {
 
         uint32_t nextTime = 0;
 
+        const String confFile = "/config.txt"; //extern const char *confFile = "/config.txt";  
 
 };
+
+
+
+
+
+
 
 
 #endif

@@ -41,17 +41,14 @@ SOFTWARE.
 #include "MQTT.h"
 #include "ESP32_SMA_Inverter_MQTT.h"
 
-ESP32_SMA_Inverter_App smaInverterApp = ESP32_SMA_Inverter_App();
+ESP32_SMA_Inverter_App& smaInverterApp = ESP32_SMA_Inverter_App::getInstance();
 ESP32_SMA_Inverter& smaInverter = ESP32_SMA_Inverter::getInstance();
-//ESP32_SMA_MQTT mqtt = ESP32_SMA_MQTT();
+ESP32_SMA_MQTT& mqttInstanceForApp = ESP32_SMA_MQTT::getInstance();
 
 uint32_t ESP32_SMA_Inverter_App::appSerial=0;
 WiFiClient ESP32_SMA_Inverter_App::espClient = WiFiClient();
 PubSubClient ESP32_SMA_Inverter_App::client = PubSubClient(espClient);
 WebServer ESP32_SMA_Inverter_App::webServer(80);
-
-ESP32_SMA_MQTT& mqttInstanceForApp = ESP32_SMA_MQTT::getInstance();
-ESP32_SMA_Inverter_App_Config& inverterAppConfig =  ESP32_SMA_Inverter_App_Config::getInstance();
 
 int ESP32_SMA_Inverter_App::smartConfig = 0;
 
@@ -75,12 +72,11 @@ void ESP32_SMA_Inverter_App::logBuild() {
 void ESP32_SMA_Inverter_App::appSetup() { 
   Serial.begin(115200); 
   delay(1000);
-  inverterAppConfig.configSetup();
+  configSetup();
   mqttInstanceForApp.wifiStartup();
   
   InverterData& invData = ESP32_SMA_Inverter::getInstance().invData;
   DisplayData& dispData = ESP32_SMA_Inverter::getInstance().dispData;  
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
 
 
   if ( !smartConfig) {
@@ -171,5 +167,166 @@ void ESP32_SMA_Inverter_App::appLoop() {
   delay(100);
 }
 
+
+// Loads the configuration from a file
+void ESP32_SMA_Inverter_App::loadConfiguration() {
+  // Open file for reading
+  File file = LittleFS.open("/config.txt","r");
+
+  // Allocate a temporary JsonDocument
+  // Don't forget to change the capacity to match your requirements.
+  // Use arduinojson.org/v6/assistant to compute the capacity.
+  StaticJsonDocument<1024> doc;
+
+  // Deserialize the JSON document
+  DeserializationError error = deserializeJson(doc, file);
+  if (error)
+    log_e("Failed to read file, using default configuration");
+
+  // Copy values from the JsonDocument to the Config         
+   String arr[] = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc"};
+   for (int i=0;i<arr->length();i++) {
+    String k = arr[i];
+    String v = doc[k];
+    log_w("load key: %s , value: %s", k, v);
+   }
+
+  #ifdef SMA_WIFI_CONFIG_VALUES_H
+    appConfig.mqttBroker =  doc["mqttBroker"] | MQTT_BROKER;
+    appConfig.mqttPort = doc["mqttPort"] | MQTT_PORT ;
+    appConfig.mqttUser = doc["mqttUser"] | MQTT_USER;
+    appConfig.mqttPasswd = doc["mqttPasswd"] | MQTT_PASS;
+    appConfig.mqttTopic = doc["mqttTopic"] | MQTT_topic;
+    appConfig.smaInvPass = doc["smaInvPass"] | SMA_PASS;
+    appConfig.smaBTAddress = doc["smaBTAddress"] | SMA_BTADDRESS;
+    appConfig.scanRate = doc["scanRate"] | SCAN_RATE ;
+    appConfig.hassDisc = doc["hassDisc"] | HASS_DISCOVERY ;
+  
+  #else
+    appConfig.mqttBroker =  doc["mqttBroker"] | "";
+    appConfig.mqttPort = doc["mqttPort"] | 1883 ;
+    appConfig.mqttUser = doc["mqttUser"] | "";
+    appConfig.mqttPasswd = doc["mqttPasswd"] | "";
+    appConfig.mqttTopic = doc["mqttTopic"] | "SMA";
+    appConfig.smaInvPass = doc["smaInvPass"] | "password";
+    appConfig.smaBTAddress = doc["smaBTAddress"] | "AA:BB:CC:DD:EE:FF";
+    appConfig.scanRate = doc["scanRate"] | 60 ;
+    appConfig.hassDisc = doc["hassDisc"] | true ;
+  #endif
+
+  
+  // Close the file (Curiously, File's destructor doesn't close the file)
+  file.close();
+  
+}
+
+
+
+// Saves the configuration to a file
+void ESP32_SMA_Inverter_App::saveConfiguration() {
+  // Delete existing file, otherwise the configuration is appended to the file
+  if (LittleFS.remove("/config.txt")) {
+    log_w("removed file %s", "/config.txt");
+  } else {
+    log_e("failed to removed file %s", "/config.txt");
+  }
+
+  // Open file for writing
+  log_i("creating file %s mode w", "/config.txt");
+  File file = LittleFS.open("/config.txt", "w");
+  if (!file) {
+    log_e("Failed to create file");
+    return;
+  }
+
+  // Allocate a temporary JsonDocument
+  // Don't forget to change the capacity to match your requirements.
+  // Use arduinojson.org/assistant to compute the capacity.
+  StaticJsonDocument<1024> doc;
+
+  // Set the values in the document
+  doc["mqttBroker"] = appConfig.mqttBroker;
+  doc["mqttPort"] = appConfig.mqttPort;
+  doc["mqttPort"] = appConfig.mqttPort;
+  doc["mqttUser"] = appConfig.mqttUser;
+  doc["mqttPasswd"] = appConfig.mqttPasswd;
+  doc["mqttTopic"] = appConfig.mqttTopic; 
+  doc["smaInvPass"] = appConfig.smaInvPass;
+  doc["smaBTAddress"] = appConfig.smaBTAddress;
+  doc["scanRate"] = appConfig.scanRate;
+  doc["hassDisc"] = appConfig.hassDisc;
+
+  String arr[] = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc"};
+  
+   for (int i=0;i<arr->length();i++) {
+    String k = arr[i];
+    String v = doc[k];
+    log_w("save key: %s , value: %s", k, v);
+   }
+
+  // Serialize JSON to file
+  if (serializeJson(doc, file) == 0) {
+    log_e("Failed to write to file");
+  } else {
+    log_w("wrote to file");
+  }
+
+  // Close the file
+  file.close();
+  log_d("close file");
+}
+
+// Prints the content of a file to the Serial
+void ESP32_SMA_Inverter_App::printFile() {
+  // Open file for reading
+  File file = LittleFS.open("/config.txt","r");
+  if (!file) {
+    log_e("Failed to read file");
+    return;
+  }
+
+  // Extract each characters by one by one
+  while (file.available()) {
+    Serial.print((char)file.read());
+  }
+  Serial.println();
+
+  // Close the file
+  file.close();
+}
+
+void ESP32_SMA_Inverter_App::configSetup() {
+  
+  if (!LittleFS.begin(false)) {
+    log_e("LittleFS mount failed");
+    if (!LittleFS.begin(true /* true: format */)) {
+      Serial.println("Failed to format LittleFS");
+    } else {
+      Serial.println("LittleFS formatted successfully");  return;
+    }
+  } else{
+    log_w("little fs mount sucess");
+  }
+
+  // Should load default config if run for the first time
+  log_w("Loading configuration...");
+  loadConfiguration( );
+
+  // Create configuration file
+  log_w("Saving configuration...");
+  saveConfiguration( );
+
+  // Dump config file
+  log_w("Print config file...");
+  printFile();
+}
+
+void ESP32_SMA_Inverter_App::rmfiles(){
+  if (LittleFS.remove("/config.txt")) {
+    log_w("%s removed", "/config.txt");
+  } else {
+    log_e("%s removal failed", "/config.txt");
+  }
+}
 
 

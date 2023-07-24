@@ -27,7 +27,6 @@ SOFTWARE.
 #include "SMA_Inverter.h"
 #include "SMA_Utils.h"
 #include "ESP32_SMA_Inverter_MQTT.h"
-#include "ESP32_SMA_Inverter_App_Config.h"
 #include "config_values.h"
 #include "ESP32Loggable.h"
 
@@ -37,37 +36,52 @@ SOFTWARE.
 //ESP32_SMA_Inverter_App_Config& appConfigInstance = ESP32_SMA_Inverter_App_Config::getInstance();
 ESP32_SMA_MQTT& mqttInstance = ESP32_SMA_MQTT::getInstance();
 
+
+//link to singleton methods
+extern void E_formPage() {
+  ESP32_SMA_MQTT::getInstance().formPage();
+}
+
+extern void E_connectAP() {
+  ESP32_SMA_MQTT::getInstance().connectAP();
+}
+
+extern void E_handleForm() {
+  ESP32_SMA_MQTT::getInstance().handleForm();
+}
+
+
 void ESP32_SMA_MQTT::wifiStartup(){
   // Build Hostname
   snprintf(mqttInstance.sapString, 20, "SMA-%08X", ESP.getEfuseMac());
-  Serial.println(mqttInstance.sapString);
+  logD(mqttInstance.sapString);
 
   // Attempt to connect to the AP stored on board, if not, start in SoftAP mode
   WiFi.mode(WIFI_STA);
   delay(2000);
 
-  Serial.println("setHostname");
+  logD("setHostname");
   WiFi.hostname(mqttInstance.sapString);
 
 #ifdef WIFI_SSID
   //overriding ssid and hostname
-  Serial.println("wifi begin with ssid and password");
+  logD("wifi begin with ssid and password");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD); 
 #else
   WiFi.begin();
 #endif
 
   delay(2000);
-  Serial.println("Using config");
+  logD("Using config");
 
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
-  Serial.println(config.mqttTopic);
+  AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
+  logD("mqtt topic: %s", config.mqttTopic);
   if (config.mqttTopic == "") 
     config.mqttTopic = mqttInstance.sapString;
   int i = 0;
   while (WiFi.status() != WL_CONNECTED) {
     // Launch smartconfig to reconfigure wifi
-    Serial.print(">");
+    logD(">");
     if (i > 3)
       mySmartConfig();
     i++;
@@ -75,26 +89,24 @@ void ESP32_SMA_MQTT::wifiStartup(){
   }
   // Success connecting 
   ESP32_SMA_Inverter_App::smartConfig = 0; 
-  String hostName = "Hostname: ";
-  hostName = hostName + mqttInstance.sapString;
-  Serial.println(hostName);
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  String hostName = mqttInstance.sapString;
+  logW("hostname %s", hostName);
+  logW("IP Address: %s", WiFi.localIP());
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
-   
   
   ESP32_SMA_Inverter_App::webServer.begin();
-  ESP32_SMA_Inverter_App::webServer.on("/", formPage);
-  ESP32_SMA_Inverter_App::webServer.on("/smartconfig", connectAP);
-  ESP32_SMA_Inverter_App::webServer.on("/postform/",handleForm);
+  ESP32_SMA_Inverter_App::webServer.on("/", E_formPage);
+  ESP32_SMA_Inverter_App::webServer.on("/smartconfig", E_connectAP);
+  ESP32_SMA_Inverter_App::webServer.on("/postform/", E_handleForm);
 
-  Serial.print("Web Server Running: ");
+  logI("Web Server Running: ");
   
 }
 
 // Configure wifi using ESP Smartconfig app on phone
 void ESP32_SMA_MQTT::mySmartConfig() {
+  logD("smartConfig");
   // Wipe current credentials
   // WiFi.disconnect(true); // deletes the wifi credentials
   
@@ -104,32 +116,31 @@ void ESP32_SMA_MQTT::mySmartConfig() {
   WiFi.beginSmartConfig();
 
   //Wait for SmartConfig packet from mobile
-  Serial.println("Waiting for SmartESP32_SMA_Inverter_App_Config::config");
+  logI("Waiting for SmartESP32_SMA_Inverter_App_Config::config");
   // if no smartconfig received after 5 minutes, reboot and try again
   int count = 0;
   while (!WiFi.smartConfigDone()) {
     delay(500);
-    Serial.print(".");
+    logD(".");
     if (count++ > 600 ) ESP.restart();
   }
 
 
 
-  Serial.println("");
-  Serial.println("SmartConfig received.");
+  logD("");
+  logI("SmartConfig received.");
 
   //Wait for WiFi to connect to AP
-  Serial.println("Waiting for WiFi");
+  logW("Waiting for WiFi");
   
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    logD(".");
   }
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  logW("IP Address: %s", WiFi.localIP());
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
-  Serial.println("Restarting in 5 seconds");
+  logW("Restarting in 5 seconds");
   delay(5000);
   ESP.restart();
 }
@@ -166,7 +177,7 @@ void ESP32_SMA_MQTT::formPage () {
   char *responseHTML;
   InverterData& invData = ESP32_SMA_Inverter::getInstance().invData;
   DisplayData& dispData = ESP32_SMA_Inverter::getInstance().dispData;  
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
+  AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
   char fulltopic[100];
 
   responseHTML = (char *)malloc(10000);
@@ -256,7 +267,7 @@ table, th, td {\
 
 // Function to extract the configuration
 void ESP32_SMA_MQTT::handleForm() {
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
+  AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
   
   log_w("Connect handleForm\n");
   if (ESP32_SMA_Inverter_App::webServer.method() != HTTP_POST) {
@@ -297,15 +308,15 @@ void ESP32_SMA_MQTT::handleForm() {
       } 
 
     }
-    ESP32_SMA_Inverter_App_Config::getInstance().saveConfiguration();
-    ESP32_SMA_Inverter_App_Config::getInstance().printFile();
+    ESP32_SMA_Inverter_App::getInstance().saveConfiguration();
+    ESP32_SMA_Inverter_App::getInstance().printFile();
     delay(3000);
     ESP.restart();
   }
 }
 
 void ESP32_SMA_MQTT::brokerConnect() {
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
+  AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
   if(config.mqttBroker.length() < 1 ){
     return;
   }
@@ -341,7 +352,7 @@ void ESP32_SMA_MQTT::brokerConnect() {
 bool ESP32_SMA_MQTT::publishData(){
   InverterData& invData = ESP32_SMA_Inverter::getInstance().invData;
   DisplayData& dispData = ESP32_SMA_Inverter::getInstance().dispData;  
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
+  AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
 
   if(config.mqttBroker.length() < 1 ){
     return(false);
@@ -399,7 +410,7 @@ bool ESP32_SMA_MQTT::publishData(){
 void ESP32_SMA_MQTT::logViaMQTT(const char *logStr){
   InverterData& invData = ESP32_SMA_Inverter::getInstance().invData;
   DisplayData& dispData = ESP32_SMA_Inverter::getInstance().dispData;  
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
+  AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
 
   char tmp[1000];
   if(config.mqttBroker.length() < 1 ){
@@ -433,7 +444,7 @@ void ESP32_SMA_MQTT::hassAutoDiscover(){
 
   InverterData& invData = ESP32_SMA_Inverter::getInstance().invData;
   DisplayData& dispData = ESP32_SMA_Inverter::getInstance().dispData;  
-  AppConfig& config = ESP32_SMA_Inverter_App_Config::getInstance().appConfig;
+  AppConfig& config = ESP32_SMA_Inverter_App::getInstance().appConfig;
 
   char tmpstr[1000];
   char topic[30];

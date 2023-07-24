@@ -28,7 +28,7 @@ SOFTWARE.
 #include "SMA_utils.h"
 #include "BluetoothSerial.h"
 #include "ESP32_SMA_Inverter_MQTT.h"
-#include "ESP32_SMA_Inverter_App_Config.h"
+//#include "ESP32_SMA_Inverter_App_Config.h"
 
 int32_t  value32 = 0;
 int64_t  value64 = 0;
@@ -41,8 +41,6 @@ const char btPin[] = {'0','0','0','0',0}; // BT pin Always 0000. (not login pass
 
 InverterData ESP32_SMA_Inverter::invData = InverterData();
 DisplayData ESP32_SMA_Inverter::dispData = DisplayData();
-//InverterData* ESP32_SMA_Inverter::pInvData = &ESP32_SMA_Inverter::invData;
-//DisplayData* ESP32_SMA_Inverter::pDispData = &ESP32_SMA_Inverter::dispData;
 
 
 bool ESP32_SMA_Inverter::begin(String localName, bool isMaster) {

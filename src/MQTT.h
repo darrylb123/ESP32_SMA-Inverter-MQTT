@@ -28,21 +28,21 @@ public:
 
     // Your class methods and members go here.
     //Prototypes
-    static void wifiStartup();
-    static void mySmartConfig();
-    static void connectAP();
-    static void wifiLoop();
-    static void formPage ();
-    static void handleForm();
-    static void brokerConnect();
-    static bool publishData();
-    static void hassAutoDiscover();
-    static void sendLongMQTT(const char *topic, const char *postscript, const char *msg);
-    static void logViaMQTT(const char *logStr);
+     void wifiStartup();
+     void mySmartConfig();
+     void connectAP();
+     void wifiLoop();
+     void formPage ();
+     void handleForm();
+     void brokerConnect();
+     bool publishData();
+     void hassAutoDiscover();
+     void sendLongMQTT(const char *topic, const char *postscript, const char *msg);
+     void logViaMQTT(const char *logStr);
 
-        char sapString[21];
-        unsigned long previousMillis = 0;
-        unsigned long interval = 30000;
+    char sapString[21];
+    unsigned long previousMillis = 0;
+    unsigned long interval = 30000;
 
 private:
     // Private constructor to prevent instantiation from outside the class.
@@ -56,7 +56,9 @@ private:
 };
 
 
-
+extern void E_formPage();
+extern void E_connectAP();
+extern void E_handleForm();
 
 
 #endif
