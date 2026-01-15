@@ -142,33 +142,39 @@ void ESP32_SMA_Inverter_App::appLoop() {
       smaInverter.disconnect(); //moved btConnected to inverter class
       
       //Send Home Assistant autodiscover
-      if(appConfig.mqttBroker.length() > 0 && appConfig.hassDisc && firstTime){
-        mqttInstanceForApp.hassAutoDiscover(appConfig.scanRate *2);
-        mqttInstanceForApp.logViaMQTT("First boot");
-        firstTime=false;
+      if(appConfig.mqttBroker.length() > 0 && appConfig.hassDisc ) { 
+        if(firstTime){
+          mqttInstanceForApp.hassAutoDiscover(1800); // Start with night time expire period
+        //mqttInstanceForApp.hassAutoDiscover(appConfig.scanRate *2);
+          mqttInstanceForApp.logViaMQTT("First boot");
+          firstTime=false;
+          dayNight = nightTime; // Set the flag to current state on boot
+        } else if( nightTime != dayNight ) {
+          if (nightTime) { // Change the expire time in home Assistant
+            mqttInstanceForApp.hassAutoDiscover(1800);
+            mqttInstanceForApp.logViaMQTT("Night Time");
+          } else {
+            mqttInstanceForApp.hassAutoDiscover(appConfig.scanRate *2);
+            mqttInstanceForApp.logViaMQTT("Day Time");
+          }
+          dayNight = nightTime;
+        }
         delay(5000);
       }
 
-      if ( nightTime != dayNight ) {
-        if (appConfig.mqttBroker.length() > 0) {
-          if (nightTime) { // Change the expire time in home Assistant
-            mqttInstanceForApp.hassAutoDiscover(1800);
-          } else {
-            mqttInstanceForApp.hassAutoDiscover(appConfig.scanRate *2);
-          }
+//       mqttInstanceForApp.publishData();
+      failCount=0;
+    } else { 
+      // Inverter shuts down at night so no bluetooth. Don't bother rebooting, just keep trying 
+      if (!nightTime) {
+        mqttInstanceForApp.logViaMQTT("Bluetooth failed to connect");
+        failCount++;
+        if( failCount > 5 ) {
+          logW("Failed to connect 5 times: Reboot\n");
+          ESP.restart();
         }
-        dayNight = nightTime;
       }
       mqttInstanceForApp.publishData();
-      failCount=0;
-    } else {  
-      mqttInstanceForApp.logViaMQTT("Bluetooth failed to connect");
-      failCount++;
-      if( failCount > 5 ) {
-        logW("Failed to connect 5 times: Reboot\n");
-        ESP.restart();
-      }
-
     } 
   }
   // DEBUG1_PRINT(".");

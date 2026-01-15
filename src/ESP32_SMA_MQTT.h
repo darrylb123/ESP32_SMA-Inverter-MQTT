@@ -108,9 +108,9 @@ private:
 
     void sendSensorValue(char *tmpstr, const char *topic, const int timeout);
 
-    void sendHassAuto(char *tmpstr, size_t msg_size, int timeout, const char *topic, const char *devclass,
-                      const char *devname, const char *unitOf, const char *sensortype,
-                      const char *sensortypeid);
+    void sendHassAuto(char *msg, size_t msg_size, int timeout, const char *topic, const char *devclass, const char *stateclass, const char *forceupdate,
+                                      const char *devname, const char *unitOf, const char *sensortype,
+                                      const char *sensortypeid);
     void sendHassAutoNoClassNoUnit(char *msg, size_t msg_size, int timeout, const char *topic,
                                    const char *devname, const char *sensortype, const char *sensortypeid);
     void sendHassAutoNoClass(char *msg, size_t msg_size, int timeout, const char *topic, const char *devname,

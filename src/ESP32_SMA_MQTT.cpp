@@ -402,25 +402,46 @@ void ESP32_SMA_MQTT::publishData(){
     char theData[2000];
     // char tmpstr[100];
 
-
-
-    snprintf(theData,sizeof(theData)-1,
+    // Etotal should never read less that the last good value, sometimes the value is set to 0 which causes havoc in the Home Assistant Energy display
+    // Send "unavailable" instead
+    if (dispData.ETotal > 10) {
+      snprintf(theData,sizeof(theData)-1,
     "{ \"Serial\": %d, \"BTStrength\": %6.2f, \"Uac\": [ %6.2f, %6.2f, %6.2f ], \"Iac\": [ %6.2f, %6.2f, %6.2f ], \"Pac\": %6.0f, \"Udc\": [ %6.2f , %6.2f ], \"Idc\": [ %6.2f , %6.2f ], \"Wdc\": [%6.0f , %6.0f ], \"Freq\": %5.2f, \"EToday\": %6.2f, \"ETotal\": %15.2f, \"InvTemp\": %4.2f, \"DevStatus\": \"%s\", \"GridRelay\": \"%s\" }"
- , invData.Serial
- , dispData.BTSigStrength
- , dispData.Uac[0],dispData.Uac[1],dispData.Uac[2]
- , dispData.Iac[0],dispData.Iac[1],dispData.Iac[1]
- , dispData.Pac
- , dispData.Udc[0], dispData.Udc[1]
- , dispData.Idc[0], dispData.Idc[1]
- , dispData.Udc[0] * dispData.Idc[0] , dispData.Udc[1] * dispData.Idc[1]
- , dispData.Freq
- , dispData.EToday
- , dispData.ETotal
- , dispData.InvTemp
- , getInverterCode(invData.DevStatus).c_str()
- , getInverterCode(invData.GridRelay).c_str()
-);
+    , invData.Serial
+    , dispData.BTSigStrength
+    , dispData.Uac[0],dispData.Uac[1],dispData.Uac[2]
+    , dispData.Iac[0],dispData.Iac[1],dispData.Iac[1]
+    , dispData.Pac
+    , dispData.Udc[0], dispData.Udc[1]
+    , dispData.Idc[0], dispData.Idc[1]
+    , dispData.Udc[0] * dispData.Idc[0] , dispData.Udc[1] * dispData.Idc[1]
+    , dispData.Freq
+    , dispData.EToday
+    , dispData.ETotal
+    , dispData.InvTemp
+    , getInverterCode(invData.DevStatus).c_str()
+    , getInverterCode(invData.GridRelay).c_str()
+    );
+    } else {
+      
+      snprintf(theData,sizeof(theData)-1,
+    "{ \"Serial\": %d, \"BTStrength\": %6.2f, \"Uac\": [ %6.2f, %6.2f, %6.2f ], \"Iac\": [ %6.2f, %6.2f, %6.2f ], \"Pac\": %6.0f, \"Udc\": [ %6.2f , %6.2f ], \"Idc\": [ %6.2f , %6.2f ], \"Wdc\": [%6.0f , %6.0f ], \"Freq\": %5.2f, \"EToday\": %6.2f, \"ETotal\": \"unavailable\", \"InvTemp\": %4.2f, \"DevStatus\": \"%s\", \"GridRelay\": \"%s\" }"
+    , invData.Serial
+    , dispData.BTSigStrength
+    , dispData.Uac[0],dispData.Uac[1],dispData.Uac[2]
+    , dispData.Iac[0],dispData.Iac[1],dispData.Iac[1]
+    , dispData.Pac
+    , dispData.Udc[0], dispData.Udc[1]
+    , dispData.Idc[0], dispData.Idc[1]
+    , dispData.Udc[0] * dispData.Idc[0] , dispData.Udc[1] * dispData.Idc[1]
+    , dispData.Freq
+    , dispData.EToday
+    , dispData.InvTemp
+    , getInverterCode(invData.DevStatus).c_str()
+    , getInverterCode(invData.GridRelay).c_str()
+    );
+
+    }
 
 
     // strcat(theData,"}");
@@ -486,25 +507,25 @@ void ESP32_SMA_MQTT::hassAutoDiscover(int timeout){
   snprintf(topic,sizeof(topic)-1, "%s-%d",config.mqttTopic.c_str(), invData.Serial);
   const size_t msg_size = sizeof(msg);
 
-    sendHassAuto(msg, msg_size, timeout, topic, "power", "AC Power", "W", "Pac", "Pac");
-    sendHassAuto(msg, msg_size, timeout, topic, "current", "A Phase Current", "A", "Iac[0]", "Iac0");
-    sendHassAuto(msg, msg_size, timeout, topic, "current", "B Phase Current", "A", "Iac[1]", "Iac1");
-    sendHassAuto(msg, msg_size, timeout, topic, "current", "C Phase Current", "A", "Iac[2]", "Iac2");
-    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "A Phase Voltage", "V", "Uac[0]", "Uac0");
-    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "B Phase Voltage", "V", "Uac[1]", "Uac1");
-    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "C Phase Voltage", "V", "Uac[2]", "Uac2");
-    sendHassAuto(msg, msg_size, timeout, topic, "frequency", "AC Frequency", "Hz", "Freq", "Freq");
-    sendHassAuto(msg, msg_size, timeout, topic, "power", "DC Power (String 1)", "W", "Wdc[0]", "Wdc0");
-    sendHassAuto(msg, msg_size, timeout, topic, "power", "DC Power (String 2)", "W", "Wdc[1]", "Wdc1");
-    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "DC Voltage (String 1)", "V", "Udc[0]", "Udc0");
-    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "DC Voltage (String 2)", "V", "Udc[1]", "Udc1");
-    sendHassAuto(msg, msg_size, timeout, topic, "current", "DC Current (String 1)", "A", "Idc[0]", "Idc0");
-    sendHassAuto(msg, msg_size, timeout, topic, "current", "DC Current (String 2)", "A", "Idc[1]", "Idc1");
+    sendHassAuto(msg, msg_size, timeout, topic, "power", "measurement", "true", "AC Power", "W", "Pac", "Pac");
+    sendHassAuto(msg, msg_size, timeout, topic, "current", "measurement", "true", "A Phase Current", "A", "Iac[0]", "Iac0");
+    sendHassAuto(msg, msg_size, timeout, topic, "current", "measurement", "true", "B Phase Current", "A", "Iac[1]", "Iac1");
+    sendHassAuto(msg, msg_size, timeout, topic, "current", "measurement", "true", "C Phase Current", "A", "Iac[2]", "Iac2");
+    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "measurement", "true", "A Phase Voltage", "V", "Uac[0]", "Uac0");
+    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "measurement", "true", "B Phase Voltage", "V", "Uac[1]", "Uac1");
+    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "measurement", "true", "C Phase Voltage", "V", "Uac[2]", "Uac2");
+    sendHassAuto(msg, msg_size, timeout, topic, "frequency", "measurement", "true", "AC Frequency", "Hz", "Freq", "Freq");
+    sendHassAuto(msg, msg_size, timeout, topic, "power", "measurement", "true", "DC Power (String 1)", "W", "Wdc[0]", "Wdc0");
+    sendHassAuto(msg, msg_size, timeout, topic, "power", "measurement", "true", "DC Power (String 2)", "W", "Wdc[1]", "Wdc1");
+    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "measurement", "true", "DC Voltage (String 1)", "V", "Udc[0]", "Udc0");
+    sendHassAuto(msg, msg_size, timeout, topic, "voltage", "measurement", "true", "DC Voltage (String 2)", "V", "Udc[1]", "Udc1");
+    sendHassAuto(msg, msg_size, timeout, topic, "current", "measurement", "true", "DC Current (String 1)", "A", "Idc[0]", "Idc0");
+    sendHassAuto(msg, msg_size, timeout, topic, "current", "measurement", "true", "DC Current (String 2)", "A", "Idc[1]", "Idc1");
 
-    sendHassAuto(msg, msg_size, timeout, topic, "energy\", \"state_class\": \"total_increasing\", \"force_update\": \"true", "kWh Today", "kWh", "EToday", "EToday");
-    sendHassAuto(msg, msg_size, timeout, topic, "energy\", \"state_class\": \"total_increasing\", \"force_update\": \"true", "kWh Total", "kWh", "ETotal", "ETotal");
+    sendHassAuto(msg, msg_size, timeout, topic, "energy", "total_increasing", "true", "kWh Today", "kWh", "EToday", "EToday");
+    sendHassAuto(msg, msg_size, timeout, topic, "energy", "total_increasing", "true", "kWh Total", "kWh", "ETotal", "ETotal");
 
-    sendHassAuto(msg, msg_size, timeout, topic, "temperature", "Inverter Temperature", "°C", "InvTemp", "InvTemp");
+    sendHassAuto(msg, msg_size, timeout, topic, "temperature", "measurement", "true", "Inverter Temperature", "°C", "InvTemp", "InvTemp");
     sendHassAutoNoClassNoUnit(msg, msg_size, timeout, topic, "Device Status", "DevStatus", "DevStatus");
     sendHassAutoNoClassNoUnit(msg, msg_size, timeout, topic, "Grid Relay Status", "GridRelay", "GridRelay");
     sendHassAutoNoClass(msg, msg_size, timeout, topic, "Bluetooth", "%", "BTStrength", "BTStrength");
@@ -525,11 +546,11 @@ ESP32_SMA_MQTT::sendHassAutoNoClass(char *msg, size_t msg_size, int timeout, con
     sendLongMQTT(topic, sensortypeid, msg);
 }
 
-void ESP32_SMA_MQTT::sendHassAuto(char *msg, size_t msg_size, int timeout, const char *topic, const char *devclass,
+void ESP32_SMA_MQTT::sendHassAuto(char *msg, size_t msg_size, int timeout, const char *topic, const char *devclass, const char *stateclass, const char *forceupdate,
                                   const char *devname, const char *unitOf, const char *sensortype,
                                   const char *sensortypeid) {
-    snprintf(msg, msg_size, "{\"device_class\": \"%s\", \"name\": \"%s\" , \"state_topic\": \"sma/solar/%s/state\", \"unit_of_measurement\": \"%s\", \"expire_after\": %d, \"value_template\": \"{{ value_json.%s }}\", \"unique_id\": \"%s-%s\", \"device\": { \"identifiers\": [\"%s\"], \"name\": \"%s\", \"manufacturer\": \"SMA\"  } } ", 
-      devclass, devname, topic, unitOf, timeout, sensortype, topic, sensortypeid, topic, topic);
+    snprintf(msg, msg_size, "{\"device_class\": \"%s\", \"state_class\": \"%s\", \"force_update\": \"%s\", \"name\": \"%s\" , \"state_topic\": \"sma/solar/%s/state\", \"unit_of_measurement\": \"%s\", \"expire_after\": %d, \"value_template\": \"{{ value_json.%s }}\", \"unique_id\": \"%s-%s\", \"device\": { \"identifiers\": [\"%s\"], \"name\": \"%s\", \"manufacturer\": \"SMA\"  } } ", 
+      devclass, stateclass, forceupdate, devname, topic, unitOf, timeout, sensortype, topic, sensortypeid, topic, topic);
     logD(msg);
     sendLongMQTT(topic, sensortypeid, msg);
 }
