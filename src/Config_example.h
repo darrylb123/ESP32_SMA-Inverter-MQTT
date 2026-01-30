@@ -41,6 +41,7 @@
 // #define SUNUP 6
 // #define SUNDOWN 18
 // #define NIGHTSCANRATE 15*60*1000
+// #define THISSERIAL 0
 
 
 

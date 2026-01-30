@@ -447,9 +447,9 @@ void ESP32_SMA_MQTT::publishData(){
     // strcat(theData,"}");
     char topic[100];
     if (config.hassDisc)
-      snprintf(topic,sizeof(topic), "sma/solar/%s-%d/state",config.mqttTopic.c_str(), invData.Serial);
+      snprintf(topic,sizeof(topic), "sma/solar/%s-%d/state",config.mqttTopic.c_str(), config.thisSerial);
     else
-      snprintf(topic,sizeof(topic), "%s-%d/state",config.mqttTopic.c_str(), invData.Serial);
+      snprintf(topic,sizeof(topic), "%s-%d/state",config.mqttTopic.c_str(), config.thisSerial);
     logI("%s = %s",topic, theData);
     int len = strlen(theData);
     ESP32_SMA_Inverter_App::client.beginPublish(topic,len,false);

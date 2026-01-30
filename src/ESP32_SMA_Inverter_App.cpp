@@ -140,7 +140,6 @@ void ESP32_SMA_Inverter_App::appLoop() {
 #endif
       
       smaInverter.disconnect(); //moved btConnected to inverter class
-      
       //Send Home Assistant autodiscover
       if(appConfig.mqttBroker.length() > 0 && appConfig.hassDisc ) { 
         if(firstTime){
@@ -174,8 +173,13 @@ void ESP32_SMA_Inverter_App::appLoop() {
           ESP.restart();
         }
       }
-      mqttInstanceForApp.publishData();
     } 
+    mqttInstanceForApp.publishData();
+  }
+  
+  if (invData.Serial != 0 && appConfig.thisSerial != invData.Serial) {
+    appConfig.thisSerial = invData.Serial;
+    ESP32_SMA_Inverter_App::getInstance().saveConfiguration();
   }
   // DEBUG1_PRINT(".");
   mqttInstanceForApp.wifiLoop();
@@ -201,7 +205,7 @@ void ESP32_SMA_Inverter_App::loadConfiguration() {
     log_e("Failed to read file, using default configuration");
 
   // Copy values from the JsonDocument to the Config         
-  std::vector<std::string> keyNames = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc"};
+  std::vector<std::string> keyNames = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc","thisserial"};
   for (uint i=0;i<keyNames.size();i++) {
     std::string k = keyNames[i];
     std::string v = doc[k];
@@ -220,6 +224,7 @@ void ESP32_SMA_Inverter_App::loadConfiguration() {
     appConfig.hassDisc = doc["hassDisc"] | HASS_DISCOVERY ;
     appConfig.timezone = doc["timezone"] | TIMEZONE;
     appConfig.ntphostname = doc["ntphostname"] | NTPHOSTNAME;
+    appConfig.thisSerial = doc["thisserial"] | THISSERIAL;
   #else
     appConfig.mqttBroker =  doc["mqttBroker"] | "";
     appConfig.mqttPort = doc["mqttPort"] | 1883 ;
@@ -232,6 +237,7 @@ void ESP32_SMA_Inverter_App::loadConfiguration() {
     appConfig.hassDisc = doc["hassDisc"] | true ;
     appConfig.timezone = doc["timezone"] | 1;
     appConfig.ntpHostname = doc["ntphostname"] | "";
+    ppConfig.thisSerial = doc["thisserial"] | THISSERIAL;
   #endif
 
   
@@ -277,8 +283,9 @@ void ESP32_SMA_Inverter_App::saveConfiguration() {
   doc["hassDisc"] = appConfig.hassDisc;
   doc["timezone"] = appConfig.timezone;
   doc["ntphostname"] = appConfig.ntphostname;
+  doc["thisserial"] = appConfig.thisSerial;
 
-  std::vector<std::string> keyNames = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc", "timezone", "ntphostname"};
+  std::vector<std::string> keyNames = {"mqttBroker", "mqttPort", "mqttUser","mqttPasswd", "mqttTopic","smaInvPass", "smaBTAddress", "scanRate", "hassDisc", "timezone", "ntphostname","thisserial"};
   for (uint i=0;i<keyNames.size();i++) {
     std::string k = keyNames[i];
     std::string v = doc[k];

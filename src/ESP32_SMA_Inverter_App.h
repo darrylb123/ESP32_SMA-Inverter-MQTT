@@ -52,6 +52,7 @@ struct AppConfig {
     bool hassDisc;
     String ntphostname;
     float timezone;
+    uint32_t thisSerial;
 };
 
 
